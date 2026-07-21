@@ -1,0 +1,89 @@
+<xml>
+  <tasks name="photochem">
+    <config name="prepare-dark">
+      <actuator name="excitation-laser" value="0" />
+      <actuator name="sample-shutter" value="0" />
+      <actuator name="reference-shutter" value="0" />
+    </config>
+    <acquire name="acquire-dark">
+      <detector name="spectro" action="snap" />
+    </acquire>
+    <config name="prepare-white">
+      <actuator name="sample-shutter" value="1" />
+    </config>
+    <acquire name="acquire-white">
+      <detector name="spectro" action="snap" />
+    </acquire>
+    <wait name="start-reference">
+      <on name="gui" signal="user_response" />
+    </wait>
+    <sub name="measure-reference" />
+    <wait name="start-measurement">
+      <on name="gui" signal="user_response" />
+    </wait>
+    <config name="start-loop">
+      <actuator name="excitation-laser" value="1" />
+      <actuator name="sample-shutter" value="0" />
+      <actuator name="reference-shutter" value="0" />
+    </config>
+    <wait name="wait-acquisition">
+      <condition source="acquisition-timer" signal="expired" />
+    </wait>
+    <config name="prepare-acquisition">
+      <actuator name="sample-shutter" value="1" />
+      <actuator name="excitation-laser" value="0" />
+    </config>
+    <acquire name="acquire">
+      <detector name="spectro" action="snap" />
+    </acquire>
+    <config name="end-acquisition">
+      <actuator name="excitation-laser" value="1" />
+      <actuator name="sample-shutter" value="0" />
+    </config>
+    <bifurcation source="reference-timer" property="expired">
+      <sub name="re-measure-reference" />
+    </bifurcation>
+    <bifurcation source="acquisition-timer" property="ended">
+      <case value="False" goto="wait-acqusition" />
+    </bifurcation>
+    <config name="finish">
+      <actuator name="excitation-laser" value="0" />
+      <actuator name="sample-shutter" value="0" />
+      <actuator name="reference-shutter" value="0" />
+    </config>
+  </tasks>
+
+  <tasks name="measure-reference">
+    <config name="prepare-reference">
+      <actuator name="sample-shutter" value="0" />
+      <actuator name="reference-shutter" value="1" />
+    </config>
+    <acquire name="acquire-reference">
+      <detector name="spectro" action="snap" />
+    </acquire>
+    <config name="finish-reference">
+      <actuator name="reference-shutter" value="0" />
+    </config>
+  </tasks>
+
+  <tasks name="re-measure-reference">
+    <config name="prepare-re-reference">
+      <actuator name="excitation-laser" value="0" />
+    </config>
+    <sub name="measure-reference" />
+    <config name="finish-re-reference">
+      <actuator name="excitation-laser" value="1" />
+    </config>
+  </tasks>
+
+  <event name="break" source="gui">
+    <goto name="finish" />
+  </event>  
+
+  <tasks name="error" on_event="error">
+    <wait name="error">
+      <condition source="gui" signal="user_response" />
+    </wait>
+    <goto name="finish" />
+  </tasks>
+</xml>

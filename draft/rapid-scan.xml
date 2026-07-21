@@ -1,0 +1,96 @@
+<xml>
+  <tasks name="prepare">
+    <config name="prepare-dark">
+      <detector name="camera" action="grab" />
+    </config>
+    <sub name="measure-dark" />
+    <sub name="measure-white" />
+    <wait name="confirm-white">
+      <condition name="gui" signal="user_response" />
+    </wait>
+    <bifurcation source="gui" property="user_response">
+      <case value="repeat" goto="prepare-dark" />  
+      <case value="abort" goto="finish" />  
+    </bifurcation>
+    <config name="prepare-main">
+      <actuator name="probe-shutter" value="1" />
+      <actuator name="excitation-shutter" value="1" />
+      <actuator name="data-processor" property="lower_limit"
+                value="{lower-limit}" />
+      <actuator name="data-processor" property="upper_limit"
+                value="{upper-limit}" />
+      <actuator name="polarizer" value="parallel" />
+      <actuator name="delay-line" value="{scan-from}" asynchron="true" />
+    </config>
+    <wait name="acquire">
+      <condition source="data-processor" signal="done"/>
+    </wait>
+    <config name="finish">
+      <actuator name="delay-line" action="stop" />
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+      <actuator name="delay-generator" action="stop" />
+      <detector name="camera" action="stop-grab" />
+    </config>
+  </tasks>
+
+  <tasks name="measure-dark">
+    <config name="prepare-dark">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+    </config>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="measure-white">
+    <config name="prepare-white">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="1" />
+    </config>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="on_target" on_event="on_target" source="delay-line">
+    <bifurcation source="delay-line" property="value">
+      <case smaller_than="{upper-limit}">
+	<config>
+          <actuator name="delay-line" value="{scan-from}" asynchron="true" />
+	</config>
+      </case>
+      <default>
+	<config>
+          <actuator name="delay-line" value="{scan-to}" asynchron="true" />
+	</config>
+      </default>
+    </bifurcation>
+  </tasks>
+
+  <tasks name="exit_upper_limit" on_event="exit_upper_limit"
+	 source="data-processor">
+    <config name="on-exit-upper">
+      <actuator name="polarizer" values="magic1,magic2" />
+    </config>
+  </tasks>  
+
+  <tasks name="exit_lower_limit" on_event="exit_lower_limit"
+	 source="data-processor">
+    <config name="on-exit-lower">
+      <actuator name="polarizer" values="perpendicular,parallel" />
+    </config>
+  </tasks>  
+
+  <tasks name="error" on_event="error" source="any">
+    <wait name="error">
+      <on name="gui" signal="user_response" />
+    </wait>    
+    <goto name="finish" />
+  </tasks>
+
+  <tasks name="break" on_event="break" source="gui">
+    <goto name="finish" />
+  </tasks>
+</xml>

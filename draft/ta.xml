@@ -1,0 +1,96 @@
+<xml>
+  <tasks name="transient-absorption">
+    <config name="prepare">
+      <detector name="camera" action="grab" />
+    </config>
+    <sub name="measure-dark" />
+    <sub name="measure-white" />
+    <wait name="confirm-white">
+      <condition source="gui" signal="user_response" />
+    </wait>
+    <bifurcation source="gui" property="user_response">
+      <case value="repeat" goto="prepare-dark" />  
+      <case value="abort" goto="finish" />  
+    </bifurcation>
+    <config name="prepare-main">
+      <actuator name="probe-shutter" value="1" />
+      <actuator name="excitation-shutter" value="1" />
+    </config>
+    <loop name="main-loop">
+      <scan mode="linear">
+        <actuator name="delay-line" from="{scan-from}" to="{scan-to}"
+                  step="{scan-steps}" />
+      </scan>
+      <wait name="acquire">
+        <condition source="data-processor" signal="data-done"/>
+      </wait>
+    </loop>
+    <config name="finish">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+      <detector name="camera" action="stop-grab" />
+    </config>
+  </tasks>
+
+  <tasks name="measure-dark">
+    <config name="prepare-dark">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+      <detector name="camera" action="grab" />
+    </config>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="measure-white">
+    <config name="prepare-white">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="1" />
+    </config>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <event name="error" source="any">
+    <wait name="error">
+      <condition name="gui" signal="user_response" />
+    </wait>    
+    <goto name="finish" />
+  </event>
+
+  <event name="break" source="gui">
+    <goto name="finish" />
+  </event>  
+
+  <!-- variants !-->
+  <!-- 2D scan !-->
+  <loop name="main-loop">
+    <scan mode="linear">
+      <actuator name="delay-line" from="{scan-from}" to="{scan-to}"
+                step="{scan-steps}" />
+      <actuator name="polarizer" values="parallel,perpendicular,magic" />
+    </scan>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </loop>
+
+  <!-- 2D scan
+       1) delays forward with parallel polarization
+       2) delays backward with magic angle 1 polarization
+       3) delays forward with perpendicular polarization
+       4) delays backward with magic angle 2 polarization
+       !-->
+  <loop name="main-loop">
+    <scan mode="linear">
+      <actuator name="polarizer" values="par,magic1,perp,magic2" />
+      <actuator mode="both-directions" name="delay-line" from="{scan-from}"
+                to="{scan-to}" step="{scan-steps}" />
+    </scan>
+    <wait name="acquire-dark">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </loop>
+</xml>

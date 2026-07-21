@@ -1,0 +1,39 @@
+<xml>
+  <tasks name="wilson">
+    <config name="init" mode="parallel">
+      <actuator name="flow-controller" value="100/0/0/0" />
+      <actuator name="PID" value="120" />
+      <actuator name="carrousel" value="waste" />
+    </config>
+    <config name="init-flow">
+      <actuator name="flow-controller" value="200" />
+    </config>
+    <loop name="main-loop">
+      <scan mode="valuelist"><!-- should ask for a file with list of values !-->
+        <value name="flows"/>
+        <value name="temperature"/>
+      </scan>
+      <config name="prepare" mode="parallel">
+        <actuator name="flow-controller" value="{flows}" />
+        <actuator name="PID" value="{temperature}" />
+        <actuator name="carrousel" value="waste" />
+      </config>
+      <config name="acquire" mode="sequential"> <!-- default mode !-->
+        <actuator name="flow-controller" value="200" />
+        <actuator name="carrousel" value="next" />
+        <detexctor name="camera" value="grab" />
+        <actuator name="flow-controller" value="2000" />
+        <detector name="camera" value="stop" />
+        <actuator name="carrousel" value="waste" />
+      </config>
+    </loop>
+    <config name="cleaning" mode="parallel">
+      <actuator name="flow-controller" value="100/0/0/0" />
+      <actuator name="PID" value="200" />
+      <actuator name="carrousel" value="waste" />
+    </config>
+    <config name="cleaning-flow">
+      <actuator name="flow-controller" value="500" />
+    </config>
+  </tasks>
+</xml>

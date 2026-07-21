@@ -1,0 +1,82 @@
+<xml>
+  <tasks name="prepare">
+    <config name="prepare-dark">
+      <actuator name="delay-generator" action="start" />
+      <detector name="ccd" action="grab" />
+    </config>
+    <sub name="measure-dark" />
+    <sub name="measure-time-zero" />
+    <sub name="measure-white" />
+    <wait name="confirm-white" mode="one">
+      <condition source="gui" signal="user_response" />
+    </wait>
+    <bifurcation source="gui" property="user_response">
+      <case value="repeat" goto="prepare-dark" />  
+      <case value="abort" goto="finish" />  
+    </bifurcation>
+    <config name="prepare-main">
+      <actuator name="probe-shutter" value="1" />
+      <actuator name="excitation-shutter" value="1" />
+    </config>
+    <loop name="main-loop" type="1D" actuator="delay-generator">
+      <scan mode="linlog">
+        <actuator name="delay-generator" lin_from="{lin-from}" lin_to="{lin-to}"
+                  lin_steps="{lin-steps}" log_to="{log-to}"
+                  points_per_decade="{points-per-decade}"
+                  neg_log_from="{neg-log-from"} />
+	<endcondition source="data-processor" property="scan-done" />
+      </scan>
+      <wait name="acquire">
+        <condition source="data-processor" signal="data-done"/>
+      </wait>
+    </loop>
+    <config name="finish">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+      <actuator name="delay-generator" action="stop" />
+      <detector name="ccd" action="stop-grab" />
+    </config>
+  </tasks>
+
+  <tasks name="measure-dark">
+    <config name="prepare-dark">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="0" />
+    </config>
+    <wait name="acquire-dark" mode="one">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="measure-white">
+    <config name="prepare-white">
+      <actuator name="excitation-shutter" value="0" />
+      <actuator name="probe-shutter" value="1" />
+    </config>
+    <wait name="acquire-dark" mode="one">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="measure-time-zero">
+    <config name="prepare-time-zero">
+      <actuator name="excitation-shutter" value="1" />
+      <actuator name="probe-shutter" value="1" />
+      <actuator name="delay-generator" value="0" />
+    </config>
+    <wait name="acquire-zero" mode="one">
+      <condition source="data-processor" signal="data-done"/>
+    </wait>
+  </tasks>
+
+  <tasks name="error" on_event="error" source="any">
+    <wait name="error">
+      <condition source="gui" signal="user_response" />
+    </wait>    
+    <goto name="finish" />
+  </tasks>
+
+  <tasks name="break" on_event="break" source="gui">
+    <goto name="finish" />
+  </tasks>  
+</xml>
