@@ -6,11 +6,11 @@ h5exporters = false  # true if plugin contains custom h5 file exporters
 scanners = false  # true if plugin contains custom scan layout (daq_scan extensions)
 
 [urls]
-package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_template' #todo modify url by your plugin url
+package-url = 'https://github.com/PyMoDAQ/pymodaq_plugins_sequencer'
 
 [project]
-name = "pymodaq_plugins_template" #todo modify template by your plugin short name
-description = 'some word about your plugin'
+name = "pymodaq_plugins_sequencer"
+description = 'Implements a Sequencer extension'
 dependencies = [
     "pymodaq>=5.2.0",
     "pymodaq_utils>=5.2.0",
@@ -20,12 +20,13 @@ dependencies = [
 ]
 
 authors = [
-    {name = "Name Surname", email = "myname@test.fr"},
+    {name = "Weber Sebastien", email = "sebastien.weber@cnrs.fr"},
+    {name = "Lang Bernhard", email = "bernhard.lang@unige.ch"},
     #todo: list here all authors of your plugin
 ]
 maintainers = [
-    {name = "Name Surname", email = "myname@test.fr"},
-    #todo: list here all maintainers of your plugin
+    {name = "Weber Sebastien", email = "sebastien.weber@cnrs.fr"},
+    {name = "Lang Bernhard", email = "bernhard.lang@unige.ch"},
 ]
 
 # nottodo: leave everything below as is!
