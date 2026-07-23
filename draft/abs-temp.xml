@@ -1,0 +1,31 @@
+<xml>
+  <tasks name="abs-temp">
+    <config name="prepare">
+      <acturator name="heater" action="on" />
+    </config>
+    <wait name="wait-acquisition">
+      <condition source="acquisition-timer" signal="expired" />
+    </wait>
+    <acquire name="acquire">
+      <detector name="spectro" action="snap" />
+      <detector name="thermo" action="snap" />
+    </acquire>
+    <bifurcation source="thermo" property="temperature">
+      <case smaller_than="{end-temperature}" goto="wait-acqusition" />
+    </bifurcation>
+    <config name="finish">
+      <acturator name="heater" action="off" />
+    </config>
+  </tasks>
+
+  <tasks name="error" on_event="error">
+    <wait name="error">
+      <condition source="gui" signal="user_response" />
+    </wait>
+    <goto name="finish" />
+  </tasks>
+
+  <tasks name="break" source="gui" on_event="break">
+    <goto name="finish" />
+  </tasks>
+</xml>

@@ -1,0 +1,405 @@
+\documentclass[a4paper]{article}
+\usepackage{a4wide,tikz}
+\advance\topmargin-6\baselineskip
+\advance\textheight6\baselineskip
+\tikzset{gbox/.style={
+    rectangle,
+    draw, 
+    text width=5cm,
+    align=center,
+    minimum height=0.8cm,
+    minimum width=1.8cm
+  },
+  confbox/.style={gbox,rounded corners,fill=green!40},
+  parbox/.style={gbox,rounded corners,fill=yellow!40},
+  questbox/.style={gbox,fill=orange!20},
+  fluxbox/.style={gbox,fill=blue!20},
+  evbox/.style={gbox,rounded corners,fill=green!10},
+}
+\begin{document}
+\section*{Legend}
+
+The color coding in the flux diagrams is as follows:
+\begin{description}
+\item[green] actions performed using the cconfigurator, sequential
+\item[yellow] actions performed using the cconfigurator, parallel
+\item[blue] subroutines, jumps and returns
+\item[orange] branches
+\item[light green] branches triggered by events
+\end{description}
+
+\section*{Tags}
+
+\begin{description}
+\item[config] configurator actions
+  \begin{description}
+    \item[actuator] name, value
+    \item[actuator] name, values: loop through values upon multiple occurence
+    \item[actuator] name, action
+    \item[detector] name, action
+  \end{description}
+\item[wait] wait on a Qt signal
+  \begin{description}
+    \item[condition] source, signal
+  \end{description}
+\item[bifurcation] source, property
+  \begin{description}
+    \item[case] value, goto|instructions
+    \item[case] smaller-than, goto|instructions
+    \item[case] smaller-than-or-equal, goto|instructions
+    \item[case] larger-than, goto|instructions
+    \item[case] larger-than-or-equal, goto|instructions
+    \item[default] goto|instructions
+  \end{description}
+\item[loop] scan definition followed by instruction tags
+  \begin{description}
+    \item[scan] mode
+    \begin{description}
+      \item[actuator] name, values
+      \item[actuator] name, from, to, steps
+      \item[actuator] name, lin-from, lin-to, lin-steps, log-to,
+        points-per-decade[, neg-log-to]
+      \item[endcondition] source, property (bool)
+    \end{description}
+  \end{description}
+\item[sub] name of subroutine
+\item[return] return from subroutine / event handler
+\item[goto] name item to jump to
+\item[event] list of instruction tags entered upon event, ends either with goto
+  or return tag
+\end{description}
+
+\subsection*{Transient Absorption}
+
+Measure absorption spectra as a function of delay between excitation and probe pulse.
+%
+As preparation measure the cameras' dark signal and the spectrum of the probe light.
+%
+The former may have to be re-recorded upon thermnal drifts.
+%
+
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node (ta) {transient absorption}; \\
+    \node [confbox] (start) {start camera}; \\
+    \node [fluxbox] (dark) {\fbox{measure dark}}; \\
+    \node [fluxbox] (ref) {\fbox{measure reference}}; \\
+    \node [confbox] (confirm) {get user confirmation}; \\
+    \node [questbox] (repeat) {Repeat?}; \& \& \node (repeat2) {}; \\
+    \node [questbox] (abort) {Abort?}; \& \& \& \node (abort2) {}; \\
+    \node [confbox] (prepmain) {shutter 1+2 open}; \\
+    \node [confbox] (setdelay) {set delay}; \\
+    \node [confbox] (acquire) {acquire}; \\
+    \node [questbox] (darkok) {Dark drifted?}; \& \node (darkok2) {}; \\
+    \node [fluxbox] (redark) {\fbox{measure dark}}; \& \node (redark2) {}; \\
+    \node [questbox] (loop) {Finished?}; \& \& \node (loop2) {}; \\
+    \node [confbox] (cleanup) {stop hardware}; \\
+    \node [fluxbox] (end) {End}; \\
+  };
+  \draw[thick,->] (start) -- (dark);
+  \draw[thick,->] (dark) -- (ref);
+  \draw[thick,->] (ref) -- (confirm);
+  \draw[thick,->] (confirm) -- (repeat);
+  \draw[thick,->] (repeat) -- (abort);
+  \draw[thick,->] (repeat) -- node [midway,below] {Y} (repeat2.center)
+  |- (dark);
+  \draw[thick,->] (abort) -- node [midway,right] {N} (prepmain);
+  \draw[thick,->] (abort) -- node [midway,above] {Y} (abort2.center)
+  |- (cleanup);
+  \draw[thick,->] (prepmain) -- (setdelay);
+  \draw[thick,->] (setdelay) -- (acquire);
+  \draw[thick,->] (acquire) -- (darkok);
+  \draw[thick,->] (darkok) -- node [midway,right] {Y} (redark);
+  \draw[thick,->] (darkok) -- (darkok2.center)
+  -- node [midway,left] {N} (redark2.south) |- (loop);
+  \draw[thick,->] (redark) -- (loop);
+  \draw[thick,->] (loop) -- node [midway,right] {Y} (cleanup);
+  \draw[thick,->] ([yshift=-10]loop.east)
+  -- node [midway,below] {N} ([yshift=-10]loop2.center) |- (setdelay);
+  \draw[thick,->] (cleanup) -- (end);
+\end{tikzpicture}}%
+\parbox{0.5\textwidth}{%
+\centerline{\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node (dark) {measure dark}; \\
+    \node [confbox] (prep) { close shutters }; \\
+    \node [confbox] (acquire) { acquire }; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (prep) -- (acquire);
+  \draw[thick,->] (acquire) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node (ref) {measure reference}; \\
+    \node [confbox] (prep) { close shutter 1, open shutter 2 }; \\
+    \node [confbox] (acquire) { acquire }; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (prep) -- (acquire);
+  \draw[thick,->] (acquire) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (error) {error}; \\
+    \node [confbox] (gui) { user confirmation }; \\
+    \node [fluxbox] (end) { stop hardware }; \\
+  };
+  \draw[thick,->] (error) -- (gui);
+  \draw[thick,->] (gui) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (break) {break}; \\
+    \node [fluxbox] (end) { stop hardware }; \\
+  };
+  \draw[thick,->] (break) -- (end);
+\end{tikzpicture}
+}}
+
+\subsection*{Variant Rapid Scan Transient Absorption}
+
+Instead of scanning the time dealy in consecutive steps in a step-scan fahsion, the optical delay line is rapidly moved forth and back.
+%
+Its actual position is recorded together with the camera at each trigger from the laser system and the resulting spectra are sorted into the corresponding time bins.
+%
+One the target, i.e.\ the end of the scanned range, has been reached, the actuator notifes the sequencer about this event.
+%
+By means of an asynchrous or parallel or history state mechanism, the sequencer
+sends the delay line to the other end of the scan range and continues acquiring.
+%
+When approaching the target at one end of the scanned range, another signal emitted from the actuator or the data processing unit may be used to notify an end of range and use the remining strech to the real end to turn a polarizer or perform  any other needed parameter or hardware update.
+%
+
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node (ta) {rapid scan TA}; \\
+    \node [confbox] (start) {start camera}; \\
+    \node [fluxbox] (dark) {\fbox{measure dark}}; \\
+    \node [fluxbox] (ref) {\fbox{measure reference}}; \\
+    \node [confbox] (confirm) {get user confirmation}; \\
+    \node [questbox] (repeat) {Repeat?}; \& \& \node (repeat2) {}; \\
+    \node [questbox] (abort) {Abort?}; \& \& \node (abort2) {}; \\
+    \node [confbox] (prepmain)
+          {shutter 1+2 open \\ set data processor limits \\ set polarizer \\
+          start delay line asynchonously}; \\
+    \node [confbox] (acquire) {acquire \\ until data processor done}; \\
+    \node [confbox] (cleanup) {stop hardware}; \\
+    \node [fluxbox] (end) {End}; \\
+  };
+  \draw[thick,->] (start) -- (dark);
+  \draw[thick,->] (dark) -- (ref);
+  \draw[thick,->] (ref) -- (confirm);
+  \draw[thick,->] (confirm) -- (repeat);
+  \draw[thick,->] (repeat) -- node [midway,right] {N} (abort);
+  \draw[thick,->] (repeat) -- node [midway,below] {Y} (repeat2.center)
+  |- (dark);
+  \draw[thick,->] (abort) -- node [midway,right] {N} (prepmain);
+  \draw[thick,->] (abort) -- node [midway,above] {Y} (abort2.center)
+  |- (cleanup);
+  \draw[thick,->] (prepmain) -- (acquire);
+  \draw[thick,->] (acquire) -- (cleanup);
+  \draw[thick,->] (cleanup) -- (end);
+\end{tikzpicture}}%
+\parbox{0.5\textwidth}{%
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (on-target) {on target}; \\
+    \node [confbox] (delay) {restart delay}; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (on-target) -- (delay);
+  \draw[thick,->] (delay) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (upper-limit) {upper limit exceeded}; \\
+    \node [confbox] (polarizer) {polarizer to magic1/2}; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (on-target) -- (delay);
+  \draw[thick,->] (delay) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (upper-limit) {upper limit exceeded}; \\
+    \node [confbox] (polarizer) {polarizer to magic1/2}; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (upper-limit) -- (polarizer);
+  \draw[thick,->] (polarizer) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (lower-limit) {lower limit exceeded}; \\
+    \node [confbox] (polarizer) {polarizer to parallele/perp.}; \\
+    \node [fluxbox] (end) { return }; \\
+  };
+  \draw[thick,->] (lower-limit) -- (polarizer);
+  \draw[thick,->] (polarizer) -- (end);
+\end{tikzpicture}}
+}
+
+Dark, reference, break and arror as with normal transient absorption.
+
+\subsection*{Photochemical Reaction}
+
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node (pchem) {photochem}; \\
+    \node [confbox] (dark) {close shutters \\ snap }; \\
+    \node [confbox] (ref) {shutter1 open, shutter2 closed \\ snap }; \\
+    \node [confbox] (conf1) {user confirmation}; \\
+    \node [confbox] (white) {shutter1 closed, shutter2 open \\ snap \\
+    shutters closed}; \\
+    \node [confbox] (conf2) {user confirmation}; \\
+    \node [confbox] (prep) {excitation laser on}; \\
+    \node [confbox] (wait) {wait}; \\
+    \node [confbox] (acquire) {shutter2 open, exct. off \\ snap \\
+      exct. on, shutter2 closed}; \\
+    \node [questbox] (refexp) {reference timer expired?}; 
+    \& \node (refexp2) {}; \\
+    \node [confbox] (reref) {exct. off \\ snap \\ exct. on}; \\
+    \node [questbox] (timexp) {measurement timer expired?}; 
+    \& \& \node (timexp2) {}; \\
+    \node [confbox] (cleanup) {lamp off, excitation laser off}; \\
+    \node [fluxbox] (end) {end}; \\
+  };
+  \draw[thick,->] (dark) -- (ref);
+  \draw[thick,->] (ref) -- (conf1);
+  \draw[thick,->] (conf1) -- (white);
+  \draw[thick,->] (white) -- (conf2);
+  \draw[thick,->] (conf2) -- (prep);
+  \draw[thick,->] (prep) -- (wait);
+  \draw[thick,->] (wait) -- (acquire);
+  \draw[thick,->] (acquire) -- (refexp);
+  \draw[thick,->] (refexp) -- node [midway,right] {Y} (reref);
+  \draw[thick,->] (refexp) -- node [midway,above] {N} (refexp2.center)
+  |- (timexp);
+  \draw[thick,->] (reref) -- (timexp);
+  \draw[thick,->] (timexp) -- node [midway,right] {Y} (cleanup);
+  \draw[thick,->] ([yshift=-10]timexp.east)
+  -- node [midway,below] {N} ([yshift=-10]timexp2.center)
+  |- (wait);
+  \draw[thick,->] (cleanup) -- (end);
+\end{tikzpicture}}%
+\parbox{0.5\textwidth}{%
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (error) {error}; \\
+    \node [confbox] (gui) { user confirmation }; \\
+    \node [fluxbox] (end) { lamp off etc. }; \\
+  };
+  \draw[thick,->] (error) -- (gui);
+  \draw[thick,->] (gui) -- (end);
+\end{tikzpicture}}
+\vspace{0.5cm}
+
+\centerline{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (break) {break}; \\
+    \node [fluxbox] (end) { lamp off etc. }; \\
+  };
+  \draw[thick,->] (break) -- (end);
+\end{tikzpicture}
+}}
+
+\subsection*{Temperature Dependent Absorption}
+
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node {temperature scan}; \\
+    \node [confbox] (heateron) {heater on}; \\
+    \node [confbox] (wait) {wait}; \\
+    \node [confbox] (acquire) {acquire spectrum and temperature}; \\
+    \node [questbox] (finished) {$t>t_{\mathrm{max}}$?};
+    \& \node (finished2) {}; \\
+    \node [confbox] (heateroff) {heater off}; \\
+    \node [fluxbox] (end) {end}; \\
+  };
+  \draw[thick,->] (heateron) -- (wait);
+  \draw[thick,->] (wait) -- (acquire);
+  \draw[thick,->] (acquire) -- (finished);
+  \draw[thick,->] (finished) -- node [midway,right] {Y} (heateroff);
+  \draw[thick,->] (finished) -- node [midway,below] {N} (finished2.center)
+  |- (wait);
+  \draw[thick,->] (heateroff) -- (end);
+\end{tikzpicture}}%
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (error) {error}; \\
+    \node [confbox] (gui) { user confirmation }; \\
+    \node [fluxbox] (end) { heater off }; \\
+  };
+  \draw[thick,->] (error) -- (gui);
+  \draw[thick,->] (gui) -- (end);
+\end{tikzpicture}
+\vspace{0.5cm}
+
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [evbox] (break) {break}; \\
+    \node [fluxbox] (end) { heater off }; \\
+  };
+  \draw[thick,->] (break) -- (end);
+\end{tikzpicture}
+}
+
+\clearpage
+\subsection*{Wilson experiemnt}
+
+\parbox{0.5\textwidth}{%
+\begin{tikzpicture}[scale=0.5]
+  \matrix[column sep=3mm,row sep=8mm,ampersand replacement=\&,fill=black!10] {
+    \node [parbox] (init)
+          {set initial flow \\ set initial temperature \\ carrousel to waste}; \\
+    \node [confbox] (initflow) {flow 200\,$\mu$l}; \\
+    \node [parbox] (set)
+          {according to current recipe: \\ set flow \\ set temperature \\
+            carrousel to waste}; \\
+    \node [confbox] (process)
+          {flow 200\,$\mu$l \\ next falcon \\ start acquisition \\
+            flow 2000\,$\mu$l \\ stop acquisition \\ carrousel to waste}; \\
+    \node [questbox] (loop) {last recipe on list?}; \& \node (loop2) {}; \\
+    \node [parbox] (cleanup)
+          {set flow \\ set temperature \\ carrousel to waste}; \\
+    \node [confbox] (cleanupflow) {flow 500\,$\mu$l}; \\
+    \node [fluxbox] (end) {end}; \\
+  };
+  \draw[thick,->] (init) -- (initflow);
+  \draw[thick,->] (initflow) -- (set);
+  \draw[thick,->] (set) -- (process);
+  \draw[thick,->] (process) -- (loop);
+  \draw[thick,->] (loop) -- node [midway,right] {Y} (cleanup);
+  \draw[thick,->] (loop) -- node [midway,below] {N} (loop2.center) |- (set);
+  \draw[thick,->] (cleanup) -- (cleanupflow);
+  \draw[thick,->] (cleanupflow) -- (end);
+\end{tikzpicture}}%
+
+\end{document}
