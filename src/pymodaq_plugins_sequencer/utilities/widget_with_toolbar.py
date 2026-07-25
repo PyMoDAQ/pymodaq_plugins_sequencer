@@ -46,10 +46,20 @@ class WidgetWithToolbar(QtWidgets.QWidget, ActionManager):
 
         self.add_widget('id', self.id_widget)
         self.add_widget('name', self.name_widget)
+        self.add_action('execute', 'Execute', 'start',
+                        tip='Execute the Sequencer Element',
+                        icon_color=get_theme().magenta,)
 
         if subwidget is not None:
             self.layout().addWidget(subwidget)
         self.layout().addStretch()
+
+    def add_action(self, *args, **kwargs):
+        if 'execute' in self.actions_names:
+            before = self.get_action('execute')
+        else:
+            before = None
+        super().add_action(*args, before=before, **kwargs)
 
     @property
     def top_layout(self) -> QtWidgets.QHBoxLayout:

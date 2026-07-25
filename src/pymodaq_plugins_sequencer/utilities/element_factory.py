@@ -7,6 +7,7 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import QWidget
 from serializall import SerializableFactory, SerializableBase
 
+from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.qt_utils import mkQApp
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
@@ -48,18 +49,20 @@ class SeqEltBase(QtCore.QObject, SeqEltBaseSer):
 
     """
     name = abstract_attribute()
-    done_signal = QtCore.Signal()
+    done_signal = QtCore.Signal(DataToExport)
 
     def __init__(self, id: int, dashboard: 'Dashboard'):
         QtCore.QObject.__init__(self)
         SeqEltBaseSer.__init__(self)
 
         self.id = id
-        self.dashboard = dashboard
+        self.dashboard: 'DashBoard' = dashboard
 
     def _create_base_widget(self) -> WidgetWithToolbar:
         """ Base Widget"""
-        return WidgetWithToolbar(self.id, self.name)
+        base_widget = WidgetWithToolbar(self.id, self.name)
+        base_widget.connect_action('execute', self.execute)
+        return base_widget
 
     def create_widget(self) -> QtWidgets.QWidget:
         """ Public API to be used to create the widget representing this elt """

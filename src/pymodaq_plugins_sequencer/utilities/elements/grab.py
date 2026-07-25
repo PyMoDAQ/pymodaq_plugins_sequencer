@@ -1,0 +1,49 @@
+from typing import TYPE_CHECKING
+
+from PySide6.QtWidgets import QWidget
+from qtpy import QtWidgets
+
+
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
+from qt_themes import get_theme
+from pymodaq.utils.managers.modules_manager import ModulesManager
+
+
+@SeqEltFactory.register_elt()
+class GrabElt(SeqEltBase):
+
+    name = 'grab'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.modules_manager = ModulesManager(
+            detectors=self.dashboard.modules_manager.detectors_all,
+            actuators=self.dashboard.modules_manager.actuators_all,
+            parent_name=self.__class__.__name__,
+        )
+        for child_name in ('actuators', 'probe_data', 'test_actuator'):
+            self.modules_manager.settings.child(child_name).show(False)
+        self.modules_manager.settings_tree.setVisible(False)
+
+        self.dashboard.experiment_manager.applied_entry.connect(self.update_detectors)
+
+    def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
+        base_widget.insert_widget(self.modules_manager.settings_tree, 1)
+        base_widget.add_action('show_settings', 'Show Settings', 'settings', "Show Settings",
+                        checkable=True, icon_checked_color=get_theme().green)
+        base_widget.connect_action('show_settings', self.modules_manager.settings_tree.setVisible)
+        return base_widget
+
+    def execute(self):
+        self.modules_manager.connect_detectors()
+        dte = self.modules_manager.grab_data()
+        self.modules_manager.connect_detectors(False)
+        self.done_signal.emit(dte)
+
+    def update_detectors(self, *args):
+        self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
+        self.modules_manager.selected_detectors_name = self.dashboard.modules_manager.detectors_all
+        self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
+        self.modules_manager.selected_actuators_name = self.dashboard.modules_manager.actuators_all
