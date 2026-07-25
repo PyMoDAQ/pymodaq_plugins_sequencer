@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtWidgets import QWidget
 from qtpy import QtWidgets
 
-
+from pymodaq_data import DataToExport
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
@@ -13,7 +13,7 @@ from pymodaq.utils.managers.modules_manager import ModulesManager
 @SeqEltFactory.register_elt()
 class GrabElt(SeqEltBase):
 
-    name = 'grab'
+    elt_name = 'grab'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,12 +31,13 @@ class GrabElt(SeqEltBase):
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
         base_widget.insert_widget(self.modules_manager.settings_tree, 1)
-        base_widget.add_action('show_settings', 'Show Settings', 'settings', "Show Settings",
-                        checkable=True, icon_checked_color=get_theme().green)
-        base_widget.connect_action('show_settings', self.modules_manager.settings_tree.setVisible)
+        self.add_action('show_settings', 'Show Settings', 'settings', "Show Settings",
+                        checkable=True, icon_checked_color=get_theme().green,
+                        toolbar=base_widget.toolbar)
+        self.connect_action('show_settings', self.modules_manager.settings_tree.setVisible)
         return base_widget
 
-    def execute(self):
+    def execute(self, dte: DataToExport=None):
         self.modules_manager.connect_detectors()
         dte = self.modules_manager.grab_data()
         self.modules_manager.connect_detectors(False)

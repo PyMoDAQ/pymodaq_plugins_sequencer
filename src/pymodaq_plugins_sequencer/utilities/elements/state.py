@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 @SeqEltFactory.register_elt()
 class StateElt(SeqEltBase):
 
-    name = 'state'
+    elt_name = 'state'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -23,13 +23,9 @@ class StateElt(SeqEltBase):
             lambda: self.done_signal.emit(DataToExport('StateElt')))
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
-        from pymodaq_gui.managers.manager_base import ManagerActions
         self.state_manager.get_external_toolbar_menu(toolbar=base_widget.toolbar)
-
-        base_widget.set_action_visible('execute', False)
-
-
+        self.set_action_visible('execute', False)
         return base_widget
 
-    def execute(self):
-        pass
+    def execute(self, dte: DataToExport):
+        pass # no need here as the execution is handled by the State Manager execute action

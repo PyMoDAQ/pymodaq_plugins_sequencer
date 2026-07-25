@@ -7,14 +7,13 @@ from pymodaq_gui.managers.action_manager import ActionManager
 from qt_themes import get_theme
 
 
-class WidgetWithToolbar(QtWidgets.QWidget, ActionManager):
+class WidgetWithToolbar(QtWidgets.QWidget):
     """ Create a Widget with a vertical layout containing a title and
     subwidgets
     """
 
     def __init__(self, id: int, name: str, subwidget:QtWidgets.QWidget = None, parent=None,
                  **label_kwargs):
-        ActionManager.__init__(self)
         QtWidgets.QWidget.__init__(self, parent)
 
         self._id = id
@@ -32,34 +31,13 @@ class WidgetWithToolbar(QtWidgets.QWidget, ActionManager):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self.top_widget)
 
-        self.add_toolbar('top', 'TopToolbar', parent=self)
+        self.toolbar = QtWidgets.QToolBar(self)
         self.top_widget.layout().addWidget(self.toolbar)
         self.top_widget.layout().addStretch()
-        self.id_widget = LabelWithFont(f'{id}', font_name=font_name,
-                              font_size=font_size, isbold=isbold,
-                              isitalic=isitalic, color=get_theme().blue)
-
-
-        self.name_widget = LabelWithFont(f'{name}', font_name=font_name,
-                              font_size=font_size, isbold=isbold,
-                              isitalic=isitalic, color=get_theme().magenta)
-
-        self.add_widget('id', self.id_widget)
-        self.add_widget('name', self.name_widget)
-        self.add_action('execute', 'Execute', 'start',
-                        tip='Execute the Sequencer Element',
-                        icon_color=get_theme().magenta,)
 
         if subwidget is not None:
             self.layout().addWidget(subwidget)
         self.layout().addStretch()
-
-    def add_action(self, *args, **kwargs):
-        if 'execute' in self.actions_names:
-            before = self.get_action('execute')
-        else:
-            before = None
-        super().add_action(*args, before=before, **kwargs)
 
     @property
     def top_layout(self) -> QtWidgets.QHBoxLayout:
@@ -73,29 +51,7 @@ class WidgetWithToolbar(QtWidgets.QWidget, ActionManager):
     def insert_widget(self, widget=QtWidgets.QWidget, ind=1):
         self.layout().insertWidget(ind, widget)
 
-    def set_id_visible(self, visible=True):
-        self.id_widget.setVisible(visible)
 
-    def set_name_visible(self, visible=True):
-        self.name_widget.setVisible(visible)
-
-    @property
-    def id(self):
-        return self._id
-
-    @id.setter
-    def id(self, value: int):
-        self._id = value
-        self.id_widget.setText(str(value))
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value: str):
-        self._name = value
-        self.name_widget.setText(value)
 
 
 if __name__ == '__main__':

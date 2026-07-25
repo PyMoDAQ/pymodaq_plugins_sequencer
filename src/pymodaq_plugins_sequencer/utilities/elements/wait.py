@@ -8,13 +8,12 @@ from pymodaq_gui.utils.widgets import SpinBox
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
-from pymodaq.utils.managers.modules_manager import ModulesManager
 
 
 @SeqEltFactory.register_elt()
 class WaitElt(SeqEltBase):
 
-    name = 'wait'
+    elt_name = 'wait'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -25,11 +24,12 @@ class WaitElt(SeqEltBase):
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
         self.spin_box = SpinBox(int=False, suffix='s', siPrefix=True)
-        base_widget.add_widget('wait_time', self.spin_box,
-                               tip='wait time')
+        self.add_widget('wait_time', self.spin_box,
+                        tip='wait time',
+                        toolbar=base_widget.toolbar)
         return base_widget
 
-    def execute(self):
+    def execute(self, dte: DataToExport = None):
         self.timer.setInterval(int(self.spin_box.value() * 1000))
         self.timer.start()
 
