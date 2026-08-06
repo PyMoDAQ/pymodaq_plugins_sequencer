@@ -13,8 +13,8 @@ from pymodaq_utils.array_manipulation import are_elements_contiguous
 
 from pymodaq_gui.qvariant import QVariant
 
-from .element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
-from ..utils import get_set_sequencer_path
+from ..element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
+from ...utils import get_set_sequencer_path
 
 
 
@@ -43,12 +43,9 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(*args, **kwargs)
 
     def createEditor(self, parent, option, index: QModelIndex):
-        serialized: bytes = index.model().get_data(index.row())
-        seq_elt: SeqEltBase = ser_factory.get_apply_deserializer(serialized)
+        seq_elt: SeqEltBase = index.data()
         widget = seq_elt.create_widget()
-
         widget.setParent(parent)
-        widget.setAutoFillBackground(True)
 
         # Set size policy to fill the cell
         widget.setSizePolicy(
@@ -57,17 +54,17 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         )
 
         # Force widget to fill cell height
-        available_height = option.rect.height()
-        widget.setMinimumHeight(available_height)
-        widget.setMaximumHeight(available_height)
+        # available_height = option.rect.height()
+        # widget.setMinimumHeight(available_height)
+        # widget.setMaximumHeight(available_height)
 
-        # Remove layout margins if present
-        if widget.layout() is not None:
-            widget.layout().setContentsMargins(0, 0, 0, 0)
-            widget.layout().setSpacing(0)
+        # # Remove layout margins if present
+        # if widget.layout() is not None:
+        #     widget.layout().setContentsMargins(0, 0, 0, 0)
+        #     widget.layout().setSpacing(0)
 
         # Connect signals for auto-commit on value change or focus loss
-        self._connect_editor_signals(widget)
+        #self._connect_editor_signals(widget)
 
         return widget
 
@@ -103,17 +100,17 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         pass
         #model.setData(index, copy.copy(editor.value()), Qt.ItemDataRole.EditRole)
 
-    def updateEditorGeometry(self, editor, option, index):
-        """Ensure editor fills the cell completely"""
-        rect = QtCore.QRect(option.rect)
-        available_height = rect.height()
-        editor.setMinimumHeight(available_height)
-        editor.setMaximumHeight(available_height)
-        editor.setGeometry(rect)
+    # def updateEditorGeometry(self, editor, option, index):
+    #     """Ensure editor fills the cell completely"""
+    #     rect = QtCore.QRect(option.rect)
+    #     available_height = rect.height()
+    #     editor.setMinimumHeight(available_height)
+    #     editor.setMaximumHeight(available_height)
+    #     editor.setGeometry(rect)
 
     def sizeHint(self, option, index):
         """Provide size hint for cells with widgets"""
-        return super().sizeHint(option, index)
+        return QtCore.QSize(100, 60)
 
 
 class SequenceModel(QtCore.QAbstractListModel):
@@ -170,6 +167,10 @@ class SequenceModel(QtCore.QAbstractListModel):
                 entry: SeqEltBase = self._data[index.row()]
                 return repr(entry)
         return QVariant()
+
+    def flags(self, index):
+
+        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEditable
 
     def dropMimeData(self, data: QMimeData, action: Qt.DropAction, row: int, column: int, parent: QModelIndex):
         if row == -1:
@@ -283,6 +284,10 @@ class SequenceModel(QtCore.QAbstractListModel):
             self.insert_data(row, data)
             self.update_delegate.emit()
 
+    def insert_data(self, row, data):
+        self.data_tmp = data
+        self.insertRows(row, 1, self.index(-1, -1))
+
     def remove_data(self, row):
         self.remove_row(row)
         self.update_delegate.emit()
@@ -307,7 +312,7 @@ class SequenceModel(QtCore.QAbstractListModel):
             file.writelines([SeqEltBase.serialize(entry) for entry in self._data])
 
 
-class SequenceTableView(QtWidgets.QTableView):
+class SequenceListView(QtWidgets.QListView):
     """
     """
 
