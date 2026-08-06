@@ -6,10 +6,19 @@ Created the 31/08/2023
 """
 from pathlib import Path
 
-from pymodaq_utils.config import BaseConfig, USER
+from pymodaq_utils.config import BaseConfig, USER, get_set_config_dir
 
 
 class Config(BaseConfig):
     """Main class to deal with configuration values for this plugin"""
     config_template_path = Path(__file__).parent.joinpath('resources/config_template.toml')
     config_name = f"config_{__package__.split('pymodaq_plugins_')[1]}"
+
+
+def get_set_sequencer_path(subfolder: str = '', user=False):
+    """ creates and return the config folder path for managers files
+    """
+    target_path = get_set_config_dir('sequences', user=user).joinpath(subfolder)
+    target_path.mkdir(parents=True, exist_ok=True)
+
+    return target_path

@@ -45,6 +45,9 @@ def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utili
         return elements
 
 
+MIME_TYPE = 'pymodaq/sequence_element'
+
+
 class SeqEltBaseSer(SerializableFactory):
     """The Base serializable class for Sequencer Elements"""
 
