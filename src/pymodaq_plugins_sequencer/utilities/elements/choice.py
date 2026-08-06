@@ -12,7 +12,7 @@ from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 
 
-@SeqEltFactory.register_elt()
+#@SeqEltFactory.register_elt()
 class ChoiceElt(SeqEltBase):
 
     elt_name = 'choice'

@@ -1,7 +1,7 @@
 from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
-from typing import Tuple, Callable, TYPE_CHECKING
+from typing import Tuple, Callable, TYPE_CHECKING, Any
 
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import QWidget
@@ -10,6 +10,7 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory, SerializableBase
 
+from packages.pymodaq.tests.extensions.extension_loading_test import dashboard
 from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.parameter_manager import ParameterManager
@@ -23,6 +24,9 @@ logger = set_logger(get_module_name(__file__))
 
 if TYPE_CHECKING:
     from pymodaq.dashboard import Dashboard
+
+
+ser_factory = SerializableFactory()
 
 
 def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utilities'):
@@ -48,11 +52,8 @@ def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utili
 MIME_TYPE = 'pymodaq/sequence_element'
 
 
-class SeqEltBaseSer(SerializableFactory):
-    """The Base serializable class for Sequencer Elements"""
-
-
-class SeqEltBase(QtCore.QObject, SeqEltBaseSer, ActionManager, ParameterManager):
+@SerializableFactory.register_decorator()
+class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
     """
@@ -60,15 +61,23 @@ class SeqEltBase(QtCore.QObject, SeqEltBaseSer, ActionManager, ParameterManager)
     done_signal = QtCore.Signal(DataToExport)
     params = []
 
-    def __init__(self, id: int, dashboard: 'Dashboard', **label_kwargs):
+    def __new__(cls, *args, **kwargs):
+        ser_factory.register_from_type(cls, cls.serialize,
+                                       cls.deserialize)  # implement
+        # serialization/deserialization to all subtypes of SeqEltBase but only when first instantiated hence the decorator
+        return super().__new__(cls)
+
+    def __repr__(self):
+        return f'Sequence Element: {self.elt_name}{self.id}'
+
+    def __init__(self, id: int, **label_kwargs):
         QtCore.QObject.__init__(self)
-        SeqEltBaseSer.__init__(self)
         ActionManager.__init__(self)
         ParameterManager.__init__(self)
 
         self._id = id
         self._go_to = id + 1
-        self.dashboard: 'DashBoard' = dashboard
+        self._dashboard: 'DashBoard' = None
 
         font_name = label_kwargs.pop('font_name', 'Tahoma')
         font_size = label_kwargs.pop('font_size', 14)
@@ -83,6 +92,35 @@ class SeqEltBase(QtCore.QObject, SeqEltBaseSer, ActionManager, ParameterManager)
         self.name_widget = LabelWithFont(f'{self.name}', font_name=font_name,
                               font_size=font_size, isbold=isbold,
                               isitalic=isitalic, color=get_theme().magenta)
+
+    @property
+    def dashboard(self) -> 'DashBoard':
+        return self._dashboard
+
+    @dashboard.setter
+    def dashboard(self, value: 'Dashboard'):
+        """ To be reimplement if necessary"""
+        self._dashboard = value
+        self.do_things_with_dashboard()
+
+    def __eq__(self, other: 'SeqEltBase'):
+        if not isinstance(other, self.__class__):
+            return False
+        for attr in ('id', 'name', 'go_to'):
+            if getattr(self, attr) != getattr(other, attr):
+                return False
+        return self._eq(other)
+
+    def _eq(self, other: 'SeqEltBase'):
+        """ Custom method to reimplement to assert two elements are equals"""
+        raise NotImplementedError
+
+    def do_things_with_dashboard(self):
+        """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
+
+        Do whatever is needed to instantiate your element with the Dashboard
+        """
+        pass
 
     def set_id_visible(self, visible=True):
         self.id_widget.setVisible(visible)
@@ -114,7 +152,7 @@ class SeqEltBase(QtCore.QObject, SeqEltBaseSer, ActionManager, ParameterManager)
         return self._go_to
 
     @go_to.setter
-    def go_to(self,value: int):
+    def go_to(self, value: int):
         self._go_to = value
 
     def _create_base_widget(self) -> WidgetWithToolbar:
@@ -160,16 +198,55 @@ class SeqEltBase(QtCore.QObject, SeqEltBaseSer, ActionManager, ParameterManager)
         raise NotImplementedError
 
     def execute(self, dte: DataToExport = None):
-        """ Execute the Element"""
+        """ Execute the Element
+
+        Should emit the done_signal when executed (could be with empty DataToExport)
+        """
         raise NotImplementedError
 
-    @staticmethod
-    def serialize(obj: "SerializableBase") -> bytes:
+
+    def serialize_custom(self) -> bytes:
+        """Serialize the custom part of the element
+
+        to be reimplemented
+        """
         raise NotImplementedError
 
-    @staticmethod
-    def deserialize(bytes_str: bytes) -> Tuple["SerializableBase", bytes]:
+    def deserialize_custom(self, bytes_str: bytes) -> bytes:
+        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
+        or methods
+
+        to be reimplemented
+
+        Returns
+        -------
+        bytes: the remaining bytes string if any
+        """
         raise NotImplementedError
+
+
+    @classmethod
+    def serialize(cls, obj: 'SeqEltBase') -> bytes:
+        bytes_string = b''
+        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id, obj._go_to))
+        bytes_string += obj.serialize_custom()
+        return bytes_string
+
+    @classmethod
+    def deserialize(cls, bytes_str: bytes) -> Tuple['SeqEltBase', bytes]:
+        """Convert bytes into a SeqEltBase object
+
+        Returns
+        -------
+        SeqEltBase: the decoded object
+        bytes: the remaining bytes string if any
+        """
+        (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id, dashboard=None)
+        seq_elt.go_to = go_to
+        remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
+
+        return seq_elt, remaining_bytes
 
 
 class SeqEltFactory:
