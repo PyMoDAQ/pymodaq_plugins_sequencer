@@ -1,0 +1,2 @@
+"from pymodaq_plugins_template.utils import Config" in C:\Users\weber\Labo\ProgrammesPython\PyMoDAQ_Git\pymodaq_plugins_folder\pymodaq_plugins_sequencer\src\pymodaq_plugins_sequencer\app\custom_app_template.py (8)
+"from pymodaq_plugins_template.utils import Config" in C:\Users\weber\Labo\ProgrammesPython\PyMoDAQ_Git\pymodaq_plugins_folder\pymodaq_plugins_sequencer\src\pymodaq_plugins_sequencer\extensions\custom_extension_template.py (11)
