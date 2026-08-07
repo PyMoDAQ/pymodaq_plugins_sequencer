@@ -81,3 +81,6 @@ class WaitElt(SeqEltBase):
     def _eq(self, other: 'WaitElt'):
         """ Custom method to reimplement to assert two elements are equals"""
         return self.wait_time == other.wait_time
+
+    def __repr__(self):
+        return f'{super().__repr__()} - {self.wait_time}ms'

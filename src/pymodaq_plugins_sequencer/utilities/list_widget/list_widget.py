@@ -37,8 +37,8 @@ class ListWidget(QtWidgets.QWidget):
         self._dashboard = dashboard
 
         self.list_view = SequenceListView()
-        self.model = SequenceModel()
-        self.list_view.setModel(self.model)
+        self._model = SequenceModel()
+        self.list_view.setModel(self._model)
 
 
         self.persistent_timer = QtCore.QTimer()
@@ -59,27 +59,27 @@ class ListWidget(QtWidgets.QWidget):
 
     def create_and_add(self, path: Iterable[str]):
         id = random.randint(0, 100)
-        ids = self.model.ids
+        ids = self._model.ids
         while id in ids:
             id = random.randint(0, 100)
         element = seq_factory.get_seq_elt(path[0])(id, dashboard=self._dashboard)
         self.add_element(element)
 
     def add_element(self, element: SeqEltBase):
-        row = self.model.rowCount()
-        self.model.add_data(row, element)
-        try:
-            self.persistent_timer.timeout.disconnect()
-        except TypeError:
-            pass
-        self.persistent_timer.timeout.connect(lambda: self.open_single_editor(row))
-        self.persistent_timer.start()
+        row = self._model.rowCount()
+        self._model.add_data(row, element)
+        # try:
+        #     self.persistent_timer.timeout.disconnect()
+        # except TypeError:
+        #     pass
+        # self.persistent_timer.timeout.connect(lambda: self.open_single_editor(row))
+        # self.persistent_timer.start()
 
     def open_single_editor(self, row: int):
-        index = self.model.index(row, 0)
+        index = self._model.index(row, 0)
         if index.isValid():
             self.list_view.openPersistentEditor(index)
-            self.model.layoutChanged.emit()
+            self._model.layoutChanged.emit()
 
     def setup_ui(self):
         self.setLayout(QtWidgets.QVBoxLayout())
@@ -88,9 +88,9 @@ class ListWidget(QtWidgets.QWidget):
         self.layout().addWidget(self.menu_button)
 
         #self.list_view.add_data_signal[str].connect(self.add_subentry)
-        self.list_view.remove_row_signal[int].connect(self.model.remove_data)
-        self.list_view.load_data_signal.connect(self.model.load)
-        self.list_view.save_data_signal.connect(self.model.save)
+        self.list_view.remove_row_signal[int].connect(self._model.remove_data)
+        self.list_view.load_data_signal.connect(self._model.load)
+        self.list_view.save_data_signal.connect(self._model.save)
         self.delegate = SequenceWidgetDelegate()
         self.list_view.setItemDelegate(self.delegate)
         self.list_view.setUniformItemSizes(False)
@@ -100,6 +100,16 @@ class ListWidget(QtWidgets.QWidget):
         self.list_view.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
         self.list_view.setAcceptDrops(True)
         self.list_view.setDragDropMode(self.list_view.DragDropMode.DragDrop)
+
+        self._model.rowsInserted.connect(self.update_view_geometry)
+        self._model.rowsRemoved.connect(self.update_view_geometry)
+        self._model.modelReset.connect(self.update_view_geometry)
+
+        self.list_view.updateGeometries()
+
+    def update_view_geometry(self):
+        self.list_view.updateGeometry()  # Force le layout parent à relire le sizeHint()
+
 
 
 if __name__ == '__main__':

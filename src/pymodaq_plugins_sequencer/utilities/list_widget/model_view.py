@@ -9,6 +9,7 @@ from qtpy.QtCore import QModelIndex, QMimeData, Qt
 from serializall import SerializableFactory
 
 from pymodaq_gui.utils import select_file
+from pymodaq_gui.utils.styling import create_font
 from pymodaq_utils.array_manipulation import are_elements_contiguous
 
 from pymodaq_gui.qvariant import QVariant
@@ -41,30 +42,37 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._editing_index = QModelIndex()
 
     def createEditor(self, parent, option, index: QModelIndex):
         if not index.isValid():
             return super().createEditor(parent, option, index)
-
-        seq_elt: SeqEltBase = index.data(QtCore.Qt.ItemDataRole.DisplayRole)
+        self._editing_index = index
+        index.model().layoutChanged.emit()
+        
+        seq_elt: SeqEltBase = index.data(QtCore.Qt.ItemDataRole.EditRole)
 
         if seq_elt:
             widget = seq_elt.create_widget(parent=parent)
             if widget.parent() is None:
                 widget.setParent(parent)
 
+            widget.setAutoFillBackground(True)
+
             # Set size policy to fill the cell
             widget.setSizePolicy(
                 QtWidgets.QSizePolicy.Policy.Expanding,
                 QtWidgets.QSizePolicy.Policy.Expanding,
             )
+
+
             return widget
 
         return super().createEditor(parent, option, index)
 
     def setEditorData(self, editor, index):
         # Get data from model and populate the custom widget
-        value = index.data(Qt.ItemDataRole.DisplayRole) or 0
+        value = index.data(Qt.ItemDataRole.EditRole) or 0
 
     def setModelData(self, editor, model, index):
         # Save the custom widget's state back to the model
@@ -81,16 +89,19 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         if not index.isValid():
             return super().sizeHint(option, index)
 
-        seq_elt = index.data(QtCore.Qt.ItemDataRole.DisplayRole)
-        if seq_elt and hasattr(seq_elt, 'size_hint'):
-            return seq_elt.size_hint()
+        if index == self._editing_index:
+            seq_elt = index.data(QtCore.Qt.ItemDataRole.EditRole)
+            if seq_elt and hasattr(seq_elt, 'size_hint'):
+                return seq_elt.size_hint()
+        return QtCore.QSize(super().sizeHint(option, index).width(), 30)
 
-        return super().sizeHint(option, index)
+    def destroyEditor(self, editor, index):
+        self._editing_index = QModelIndex()
+        index.model().layoutChanged.emit()
+        super().destroyEditor(editor, index)
 
 
 class SequenceModel(QtCore.QAbstractListModel):
-
-    update_delegate = QtCore.Signal()
 
     def __init__(self, parent: QtWidgets.QWidget = None,
                  data: list[SeqEltBase] = None,
@@ -137,9 +148,9 @@ class SequenceModel(QtCore.QAbstractListModel):
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> Any:
         if index.isValid():
             if role == Qt.ItemDataRole.DisplayRole:
-                return self._data[index.row()]
+                return repr(self._data[index.row()])
             elif role == Qt.ItemDataRole.EditRole:
-                return None
+                return self._data[index.row()]
             elif role == Qt.ItemDataRole.CheckStateRole and index.column() == 0 and self._show_checkbox:
                 if self._checked[index.row()]:
                     return Qt.CheckState.Checked
@@ -148,6 +159,8 @@ class SequenceModel(QtCore.QAbstractListModel):
             elif role == Qt.ItemDataRole.ToolTipRole:
                 entry: SeqEltBase = self._data[index.row()]
                 return repr(entry)
+            elif role == Qt.ItemDataRole.FontRole:
+                return self._data[index.row()].font.get_font()
         return None
 
     def flags(self, index):
@@ -269,7 +282,7 @@ class SequenceModel(QtCore.QAbstractListModel):
             if data in self._data:
                 return
             self.insert_data(row, data)
-            self.update_delegate.emit()
+            self.layoutChanged.emit()
 
     def insert_data(self, row, data):
         self.beginInsertRows(self.index(-1, -1), row, row+1)
@@ -279,7 +292,6 @@ class SequenceModel(QtCore.QAbstractListModel):
 
     def remove_data(self, row):
         self.remove_row(row)
-        self.update_delegate.emit()
 
     def remove_row(self, row: int):
         self.beginRemoveRows(self.index(row), row, row)
@@ -297,7 +309,6 @@ class SequenceModel(QtCore.QAbstractListModel):
 
             for row in data:
                 self.insert_data(self.rowCount(self.index(-1, -1)), row)
-        self.update_delegate.emit()
 
     def save(self, fname: str = None):
         if fname is None:
@@ -379,4 +390,23 @@ class SequenceListView(QtWidgets.QListView):
         except Exception as e:
             pass
 
+    def sizeHint(self):
+        # Taille de base si le modèle est vide
+        if not self.model() or self.model().rowCount() == 0:
+            return QtCore.QSize(200, 50)
 
+        total_height = 0
+        count = self.model().rowCount()
+        max_width = 0
+        for ind in range(count):
+            index = self.model().index(ind, 0)
+            total_height += self.sizeHintForIndex(index).height()
+            max_width = max(max_width,self.sizeHintForIndex(index).width() )
+
+        margins = self.contentsMargins()
+        frame_width = self.frameWidth() * 2
+
+        final_height = total_height + margins.top() + margins.bottom() + frame_width
+        final_width = max_width + margins.left() + margins.right() + frame_width
+
+        return QtCore.QSize(final_width, final_height)

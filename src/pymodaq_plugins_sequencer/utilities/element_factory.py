@@ -69,7 +69,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         return super().__new__(cls)
 
     def __repr__(self):
-        return f'Sequence Element: {self.elt_name}{self.id}'
+        return f'{self.id} - {self.elt_name.capitalize()}'
 
     def __init__(self, id: int, **label_kwargs):
         QtCore.QObject.__init__(self)
@@ -81,7 +81,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         self._dashboard: 'DashBoard' = None
 
         font_name = label_kwargs.pop('font_name', 'Tahoma')
-        font_size = label_kwargs.pop('font_size', 14)
+        font_size = label_kwargs.pop('font_size', 10)
         isbold = label_kwargs.pop('isbold', True)
         isitalic = label_kwargs.pop('isitalic', True)
 
@@ -99,12 +99,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
 
     def set_dashboard(self, dashboard: 'DashBoard'):
         self.dashboard = dashboard
-
-    def set_id_visible(self, visible=True):
-        self.id_widget.setVisible(visible)
-
-    def set_name_visible(self, visible=True):
-        self.name_widget.setVisible(visible)
 
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):

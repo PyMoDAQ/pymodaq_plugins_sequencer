@@ -54,7 +54,7 @@ class StateElt(SeqEltBase):
         self.state_manager.applied_entry.connect(
             lambda: self.done_signal.emit(DataToExport('StateElt')))
         self.state_manager.new_entry.connect(self.update_states)
-        self.connect_action('show_state', self.state_manager.show)
+
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
 
@@ -62,10 +62,11 @@ class StateElt(SeqEltBase):
                         "Show State Manager",
                         checkable=True, icon_checked_color=get_theme().green,
                         toolbar=base_widget.toolbar)
-
+        self.connect_action('show_state', self.state_manager.force_show)
         combo = ComboBox(base_widget)
         combo.set_items(self.state_manager.entries)
         base_widget.add_widget_top(combo)
+        combo.setCurrentText(self.state)
         combo.currentTextChanged.connect(self.set_state)
         self._combo = weakref.ref(combo)
         self.state_manager.parent.closeEvent = lambda event: self.set_action_checked('show_state', False)
