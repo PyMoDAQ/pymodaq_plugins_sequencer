@@ -35,7 +35,7 @@ class SequenceWidget(QtWidgets.QWidget):
 
         self._dashboard = dashboard
 
-        self.view = SequenceTreeView()
+        self.view = SequenceTreeView(parent=parent, dashboard=dashboard)
         self._model = SequenceTreeModel()
         self.view.setModel(self._model)
 
@@ -83,7 +83,8 @@ if __name__ == '__main__':
                 seq_factory.get_seq_elt('grab')(5),
                 ]
 
-    list_widget = SequenceWidget(elements=elements)
+    list_widget = SequenceWidget(elements=elements,
+                                 dashboard=dashboard)
     list_widget.show()
 
     for element in elements:

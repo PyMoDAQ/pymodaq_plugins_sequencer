@@ -1,13 +1,14 @@
 from pathlib import Path
 import random
-from typing import Any, Union, Iterable
+from typing import Any, Union, Iterable, TYPE_CHECKING
 
 from qtpy import QtWidgets, QtCore
 
 from qtpy.QtCore import QModelIndex, QMimeData, Qt
-
+from qt_themes import get_theme
 
 from serializall import SerializableFactory
+
 
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton
@@ -19,7 +20,8 @@ from pymodaq_gui.qvariant import QVariant
 from ..element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
 from ...utils import get_set_sequencer_path
 
-
+if TYPE_CHECKING:
+    from pymodaq.scripting import Dashboard
 
 seq_factory = SeqEltFactory()
 ser_factory = SerializableFactory()
@@ -127,7 +129,7 @@ class AddButtonPlaceholder(SeqEltBase):
 
     def create_widget(self, parent=None) -> QtWidgets.QWidget:
         return MenuButton('Add Element',
-                          seq_factory.elements,
+                          [elt.capitalize() for elt in seq_factory.elements],
                           update_button_text=False,
                           parent=parent)
 
@@ -268,7 +270,10 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
     def get_ids(self, parent_index: QModelIndex) -> list[int]:
         """ Get the ids of the existing elements"""
-        parent_elt = parent_index.internalPointer()
+        if not parent_index.isValid():
+            parent_elt = self.root_node
+        else:
+            parent_elt = parent_index.internalPointer()
         return [elt.id for elt in parent_elt]
 
 class SequenceModel(QtCore.QAbstractListModel):
@@ -423,32 +428,6 @@ class SequenceModel(QtCore.QAbstractListModel):
         while self.rowCount() > 0:
             self.remove_row(0)
 
-    def edit_data(self, index):
-        entry = self._data[index.row()]
-        dialog = QDialog()
-
-        vlayout = QtWidgets.QVBoxLayout()
-        dialog.setLayout(vlayout)
-
-        module_index = get_module_index_from_param(entry.setting)
-        vlayout.addWidget(QtWidgets.QLabel(
-            f'Setting from module {entry.module_name} with path:\n {entry.setting.path[module_index+2:]}'))
-        setting = Parameter.create(name='settings', type='group', children=[entry.setting.parameter.saveState()])
-        tree = StateParameterTree(parent=dialog)
-        tree.setParameters(setting, showTop=False)
-        buttonBox = QDialogButtonBox(parent=dialog)
-        buttonBox.addButton("Done", QDialogButtonBox.ButtonRole.AcceptRole)
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.addButton("Cancel", QDialogButtonBox.ButtonRole.RejectRole)
-        buttonBox.rejected.connect(dialog.reject)
-
-        vlayout.addWidget(tree)
-        vlayout.addWidget(buttonBox)
-        dialog.setWindowTitle("Edit the setting")
-        res = dialog.exec()
-
-        if res:
-            entry.setting.parameter.setValue(setting.children()[0].value())
 
     def add_data(self, row, data: SeqEltBase):
         if data is not None:
@@ -501,9 +480,14 @@ class SequenceTreeView(QtWidgets.QTreeView):
     load_data_signal = QtCore.Signal()
     save_data_signal = QtCore.Signal()
 
-    def __init__(self, menu=True):
-        super().__init__()
+    def __init__(self, menu=True, dashboard: 'Dashboard' = None, parent=None):
+        super().__init__(parent)
         self.setmenu(menu)
+        self._dashboard = dashboard
+
+    @property
+    def dashboard(self) -> 'Dashboard':
+        return self._dashboard
 
     def model(self) -> SequenceTreeModel:
         return super().model()
@@ -529,22 +513,73 @@ class SequenceTreeView(QtWidgets.QTreeView):
         # On ne boucle QUE sur les enfants directs de ce parent pour des raisons de performance
         for row in range(model.rowCount(parent_index)):
             current_index = model.index(row, 0, parent_index)
-            node = current_index.internalPointer()
+            elt: SeqEltBase = current_index.internalPointer()
 
-            if node.name == AddButtonPlaceholder.elt_name:
+            if elt.name == AddButtonPlaceholder.elt_name:
                 if self.indexWidget(current_index) is not None:
                     continue
                 container = QtWidgets.QWidget(self.viewport())
+                container.setStyleSheet("background-color: transparent;")
                 layout = QtWidgets.QHBoxLayout(container)
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.setSpacing(0)
 
-                btn = QtWidgets.QPushButton("+ Add Item")
+                btn: MenuButton = elt.create_widget()
+                btn.setFixedHeight(30)
+
+                btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: transparent;
+                        color: {get_theme().primary};
+                        border: 1px dashed {get_theme().primary};
+                        border-radius: 4px;
+                        font-weight: bold;
+                        font-size: 12px;
+                        text-align: center;
+                    }}
+
+                    QPushButton:hover {{
+                        background-color: {get_theme().primary}14;
+                        border: 1px solid {get_theme().secondary};
+                        color: {get_theme().secondary};
+                    }}
+
+                    QPushButton:pressed {{
+                        background-color: {get_theme().primary}33;
+                    }}
+
+                    QPushButton::menu-indicator {{
+                        image: none;
+                        subcontrol-position: right center;
+                        subcontrol-origin: padding;
+                        left: -8px;
+                    }}
+                """)
+                btn.add_menu.setStyleSheet(f"""
+                    QMenu {{
+                        background-color: {get_theme().base};
+                        border: 1px solid {get_theme().secondary};
+                        border-radius: 4px;
+                        padding: 4px;
+                    }}
+                    
+                    QMenu::item {{
+                        background-color: transparent;
+                        color: {get_theme().text};
+                        padding: 6px 20px;
+                        border-radius: 2px;
+                    }}
+                    
+                    QMenu::item:selected {{
+                        background-color: {get_theme().primary};
+                        color: {get_theme().mantle};
+                    }}
+                """)
                 layout.addWidget(btn)
                 layout.addStretch()
-                node._btn_reference = container
+                elt._btn_reference = container
                 container.show()
-                btn.clicked.connect(lambda path: self.create_and_add(path , current_index.parent()))
+                btn.triggered.connect(lambda path: self.create_and_add(path , current_index.parent()))
 
                 self.setIndexWidget(current_index, container)
                 pass
@@ -555,7 +590,8 @@ class SequenceTreeView(QtWidgets.QTreeView):
         ids = self.model().get_ids(parent_index)
         while id in ids:
             id = random.randint(0, 100)
-        element = seq_factory.get_seq_elt(path[0])(id, dashboard=self._dashboard)
+        element = seq_factory.get_seq_elt(path[0].lower())(id,)
+        element.dashboard = self.dashboard
         self.model().insert_data(parent_index=parent_index,
                                  row=-1,
                                  new_object=element)
@@ -588,34 +624,12 @@ class SequenceTreeView(QtWidgets.QTreeView):
     def clear(self):
         self.model().clear()
 
-    def add(self, special_entry: str):
-        self.add_data_signal.emit(special_entry)
-
     def remove(self):
         """ Remove selected rows, starting from the last one (to not mess with indexing)"""
         rows = list(set([index.row() for index in self.selectedIndexes()]))
         rows.sort(key=lambda row: -row)
         for row in rows:
             self.remove_row_signal.emit(row)
-
-    def data_has_changed(self, topleft, bottomright, roles):
-        self.valueChanged.emit([topleft, bottomright, roles])
-
-    def get_table_value(self):
-        """
-
-        """
-        return self.model()
-
-    def set_table_value(self, data_model):
-        """
-
-        """
-        try:
-            self.setModel(data_model)
-            self.model().dataChanged.connect(self.data_has_changed)
-        except Exception as e:
-            pass
 
     def sizeHint(self):
         # Taille de base si le modèle est vide
