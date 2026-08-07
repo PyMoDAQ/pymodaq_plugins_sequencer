@@ -1,9 +1,10 @@
-from qtpy import QtCore
+import weakref
 
+from qtpy import QtCore
+from qt_themes import get_theme
 from serializall import SerializableFactory
 
 from pymodaq_data import DataToExport
-
 from pymodaq.utils.managers.state.state_manager import StateManager
 from pymodaq_gui.managers.manager_base import ManagerActions
 from pymodaq_gui.utils.widgets.combo import ComboBox
@@ -26,6 +27,7 @@ class StateElt(SeqEltBase):
         self.state_manager = StateManager()
 
         self._state = self.state_manager.entry
+        self._combo: weakref.ref[ComboBox] | None = None  # weakref to the combobox holding the states
 
     @property
     def state(self) -> str:
@@ -35,6 +37,14 @@ class StateElt(SeqEltBase):
     def state(self, value: str):
         self._state = value
 
+    @property
+    def states(self) -> list[str]:
+        return self.state_manager.entries[:]
+
+    def update_states(self):
+        if self._combo is not None and self._combo() is not None:
+            self._combo().set_items(self.states)
+
     @QtCore.Slot(str)
     def set_state(self, value: str):
         self.state = value
@@ -43,12 +53,23 @@ class StateElt(SeqEltBase):
         self.state_manager: 'StateManager' = self.dashboard.state_manager
         self.state_manager.applied_entry.connect(
             lambda: self.done_signal.emit(DataToExport('StateElt')))
+        self.state_manager.new_entry.connect(self.update_states)
+        self.connect_action('show_state', self.state_manager.show)
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
+
+        self.add_action('show_state', 'Show Manager', self.state_manager.icon_name,
+                        "Show State Manager",
+                        checkable=True, icon_checked_color=get_theme().green,
+                        toolbar=base_widget.toolbar)
+
         combo = ComboBox(base_widget)
         combo.set_items(self.state_manager.entries)
         base_widget.add_widget_top(combo)
         combo.currentTextChanged.connect(self.set_state)
+        self._combo = weakref.ref(combo)
+        self.state_manager.parent.closeEvent = lambda event: self.set_action_checked('show_state', False)
+
         return base_widget
 
     def execute(self, dte: DataToExport):
@@ -86,3 +107,7 @@ class StateElt(SeqEltBase):
         """ Custom method to reimplement to assert two elements are equals"""
         return (self.state_manager.entry == other.state_manager.entry and
                 self.state_manager.experiment_filename == other.state_manager.experiment_filename)
+
+    def size_hint(self) -> QtCore.QSize:
+        size = super().size_hint()
+        return QtCore.QSize(250, size.height())

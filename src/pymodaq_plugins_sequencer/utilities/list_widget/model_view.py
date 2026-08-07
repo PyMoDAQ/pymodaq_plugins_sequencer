@@ -107,6 +107,11 @@ class SequenceModel(QtCore.QAbstractListModel):
 
         super().__init__(parent)
 
+    @property
+    def ids(self) -> list[int]:
+        """ Get the ids of the existing elements"""
+        return [elt.id for elt in self._data]
+
     def rowCount(self, *args, **kwargs):
         return len(self._data)
 
