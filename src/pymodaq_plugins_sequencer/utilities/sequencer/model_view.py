@@ -9,7 +9,7 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory
 
-
+from pymodaq_data import DataToExport
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton
 from pymodaq_gui.utils.styling import create_font
@@ -136,6 +136,9 @@ class AddButtonPlaceholder(SeqEltBase):
     def _eq(self, other: 'SeqEltBase'):
         return True
 
+    def execute(self, dte: DataToExport = None):
+        self.done_signal.emit(DataToExport('button'))
+
 
 class SequenceTreeModel(QtCore.QAbstractItemModel):
     def __init__(self,
@@ -183,6 +186,8 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         else:
             parent_node = parent.internalPointer()
 
+        if parent_node is None:
+            return 0
         return len(parent_node.children)
 
     def columnCount(self, parent=QModelIndex()):
@@ -595,6 +600,13 @@ class SequenceTreeView(QtWidgets.QTreeView):
         self.model().insert_data(parent_index=parent_index,
                                  row=-1,
                                  new_object=element)
+        parent_elt = self.elt_from_index(parent_index)
+        elt_index = self.model().index(len(parent_elt.children) - 2, 0, parent_index)
+        if element.children_allowed:
+            self.model().insert_data(elt_index, 0, AddButtonPlaceholder())
+
+    def elt_from_index(self, index: QtCore.QModelIndex) -> SeqEltBase:
+        return index.internalPointer() if index.isValid() else self.model().root_node
 
     def edit_row(self):
         index = self.currentIndex()

@@ -59,9 +59,9 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
     """
-    child_added_signal = QtCore.Signal(object, object)
     elt_name = abstract_attribute()
     done_signal = QtCore.Signal(DataToExport)
+    children_allowed = False
     params = []
 
     def __new__(cls, *args, **kwargs):

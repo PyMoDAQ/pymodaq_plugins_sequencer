@@ -19,6 +19,7 @@ ser_factory = SerializableFactory()
 class GrabElt(SeqEltBase):
 
     elt_name = 'grab'
+    children_allowed = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -20,6 +20,7 @@ ser_factory = SerializableFactory()
 class StateElt(SeqEltBase):
 
     elt_name = 'state'
+    children_allowed = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -17,6 +17,7 @@ ser_factory = SerializableFactory()
 class WaitElt(SeqEltBase):
 
     elt_name = 'wait'
+    children_allowed = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -80,6 +81,8 @@ class WaitElt(SeqEltBase):
 
     def _eq(self, other: 'WaitElt'):
         """ Custom method to reimplement to assert two elements are equals"""
+        if not hasattr(other, 'wait_time'):
+            return False
         return self.wait_time == other.wait_time
 
     def __repr__(self):
