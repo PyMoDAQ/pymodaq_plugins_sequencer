@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import Any, Union
+import random
+from typing import Any, Union, Iterable
 
 from qtpy import QtWidgets, QtCore
 
@@ -9,6 +10,7 @@ from qtpy.QtCore import QModelIndex, QMimeData, Qt
 from serializall import SerializableFactory
 
 from pymodaq_gui.utils import select_file
+from pymodaq_gui.utils.menu_utils import MenuButton
 from pymodaq_gui.utils.styling import create_font
 from pymodaq_utils.array_manipulation import are_elements_contiguous
 
@@ -36,7 +38,6 @@ def elements_from_path(fname: Path) -> list[SeqEltBase]:
         entry, all_lines = SeqEltBase.deserialize(all_lines)
         data.append(entry)
     return data
-
 
 class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
@@ -108,6 +109,166 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         index.model().layoutChanged.emit()
         super().destroyEditor(editor, index)
 
+class RootNode(SeqEltBase):
+    elt_name = 'root'
+    def __init__(self, parent=None):
+        # Pass a specific string or ID to distinguish it from standard data
+        super().__init__(id=-1, parent=parent)
+
+    def _eq(self, other: 'SeqEltBase'):
+        return True
+
+class AddButtonPlaceholder(SeqEltBase):
+    elt_name = 'button'
+    def __init__(self, parent=None):
+        # Pass a specific string or ID to distinguish it from standard data
+        super().__init__(id=-2, parent=parent)
+
+    def create_widget(self, parent=None) -> QtWidgets.QWidget:
+        return MenuButton('Add Element',
+                          seq_factory.elements,
+                          update_button_text=False,
+                          parent=parent)
+
+    def _eq(self, other: 'SeqEltBase'):
+        return True
+
+
+class SequenceTreeModel(QtCore.QAbstractItemModel):
+    def __init__(self,
+                 parent: QtCore.QObject = None,
+                 ):
+
+        super().__init__(parent)
+        self.root_node =  RootNode()
+        self.insert_data(QtCore.QModelIndex(), 0, AddButtonPlaceholder())
+
+    def index(self, row, column, parent=QModelIndex()):
+        if not self.hasIndex(row, column, parent):
+            return QModelIndex()
+
+        if not parent.isValid():
+            parent_node = self.root_node
+        else:
+            parent_node = parent.internalPointer()
+
+        child_node = parent_node.children[row]
+        if child_node:
+            return self.createIndex(row, column, child_node)
+        return QModelIndex()
+
+    def parent(self, child: QModelIndex):
+        if not child.isValid():
+            return QModelIndex()
+
+        child_node = child.internalPointer()
+        parent_node = child_node.parent
+
+        if parent_node == self.root_node:
+            return QModelIndex()
+
+        grandparent_node = parent_node.parent
+        row = grandparent_node.children.index(parent_node)
+        return self.createIndex(row, 0, parent_node)
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.column() > 0:
+            return 0
+
+        if not parent.isValid():
+            parent_node = self.root_node
+        else:
+            parent_node = parent.internalPointer()
+
+        return len(parent_node.children)
+
+    def columnCount(self, parent=QModelIndex()):
+        return 1
+
+    def data(self, index, role=Qt.ItemDataRole):
+        if not index.isValid():
+            return None
+
+        elt: SeqEltBase = index.internalPointer()
+        # --- HANDLE THE BUTTON PLACEHOLDER ---
+        if elt.elt_name == AddButtonPlaceholder.elt_name:
+            if role == Qt.ItemDataRole.DisplayRole:
+                return None
+            if role == Qt.ItemDataRole.SizeHintRole:
+                return QtCore.QSize(100, 28)
+            return None
+
+        if role == Qt.ItemDataRole.DisplayRole:
+            return repr(elt)
+        elif role == Qt.ItemDataRole.EditRole:
+            return elt
+        return None
+
+    def flags(self, index):
+        default_flags = super().flags(index)
+        if index.isValid():
+            node = index.internalPointer()
+            if node.name == AddButtonPlaceholder.elt_name:
+                return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            return (default_flags |
+                    Qt.ItemFlag.ItemIsEnabled |
+                    Qt.ItemFlag.ItemIsSelectable |
+                    Qt.ItemFlag.ItemIsDragEnabled |
+                    Qt.ItemFlag.ItemIsEditable)
+        else:
+            return default_flags | Qt.ItemFlag.ItemIsDropEnabled
+
+    def insert_data(self, parent_index: QModelIndex,
+                    row: int,
+                    new_object: SeqEltBase) -> bool:
+        """
+        Inserts an instance of SeqEltBase (or real implementation) under the given parent item.
+        """
+        # 1. Retrieve the container object (either the invisible root or a visible object from the view)
+        if not parent_index.isValid():
+            parent_object = self.root_node
+        else:
+            parent_object = parent_index.internalPointer()
+
+        # Safety check: If the row position is out of bounds, append to the end of the list
+        if row == 0:  # because we are inserting a AddButton
+            pass
+        elif row < 0 or row > len(parent_object.children) -1:
+            row = len(parent_object.children) -1 #-1 because we-ve inserted a AddButton
+
+        self.beginInsertRows(parent_index, row, row)
+        new_object.parent = parent_object
+        parent_object.children.insert(row, new_object)
+        self.endInsertRows()
+
+        return True
+
+    def insert_data_by_node(self, parent_node: SeqEltBase,
+                            row: int, new_object: SeqEltBase) -> bool:
+        """
+        Inserts a new object using a raw Python parent node instead of a QModelIndex.
+        """
+        # 1. Generate the QModelIndex for this parent node
+        if parent_node == self.root_node:
+            # The invisible root node has no valid QModelIndex in Qt's eyes
+            parent_index = QModelIndex()
+        else:
+            # To create the index, we need to know which row the parent occupies inside ITS own parent
+            grandparent: SeqEltBase = parent_node.parent
+            if grandparent is None:
+                # Fallback safety if the parent node is detached
+                parent_index = QModelIndex()
+            else:
+                parent_row = grandparent.children.index(parent_node)
+                # Create the valid Qt index pointing to our parent node
+                parent_index = self.createIndex(parent_row, 0, parent_node)
+
+            self.insert_data(parent_index, row, new_object)
+
+    @property
+    def ids(self) -> list[int]:
+        """ Get the ids of the existing elements"""
+        return [elt.id for elt in self._data]
 
 class SequenceModel(QtCore.QAbstractListModel):
 
@@ -130,9 +291,10 @@ class SequenceModel(QtCore.QAbstractListModel):
         self._data[index.row()].setup_dialog()
 
     @property
-    def ids(self) -> list[int]:
+    def get_ids(self, parent_index: QModelIndex) -> list[int]:
         """ Get the ids of the existing elements"""
-        return [elt.id for elt in self._data]
+        parent_elt = parent_index.internalPointer()
+        return [elt.id for elt in parent_elt]
 
     def rowCount(self, *args, **kwargs):
         return len(self._data)
@@ -329,7 +491,7 @@ class SequenceModel(QtCore.QAbstractListModel):
             file.writelines([SeqEltBase.serialize(entry) for entry in self._data])
 
 
-class SequenceListView(QtWidgets.QListView):
+class SequenceTreeView(QtWidgets.QTreeView):
     """
     """
 
@@ -342,7 +504,60 @@ class SequenceListView(QtWidgets.QListView):
     def __init__(self, menu=True):
         super().__init__()
         self.setmenu(menu)
-        #self.doubleClicked.connect(self.edit_row)
+
+    def model(self) -> SequenceTreeModel:
+        return super().model()
+
+    def setModel(self, model: SequenceTreeModel):
+        super().setModel(model)
+        if model:
+            # RÈGLE 1 : Si le modèle ajoute des lignes (ex: au démarrage ou après un ajout), on applique les boutons
+            model.rowsInserted.connect(self._on_rows_inserted)
+
+            # RÈGLE 2 : Dès que l'utilisateur déplie une branche, on force l'application sur les enfants désormais visibles
+            self.expanded.connect(self.update_section_buttons)
+
+            # Premier rendu initial pour le niveau racine
+            self.update_section_buttons(QModelIndex())
+
+    def _on_rows_inserted(self, parent_index, start, end):
+        """Triggered automatically whenever rows are added to the model."""
+        self.update_section_buttons(parent_index)
+
+    def update_section_buttons(self, parent_index=QModelIndex()):
+        """Loops through immediate children of parent_index and injects buttons."""
+        model = self.model()
+        if not model:
+            return
+
+        # On ne boucle QUE sur les enfants directs de ce parent pour des raisons de performance
+        for row in range(model.rowCount(parent_index)):
+            current_index = model.index(row, 0, parent_index)
+            node = current_index.internalPointer()
+
+            if node.name == AddButtonPlaceholder.elt_name:
+                if self.indexWidget(current_index) is not None:
+                    continue
+                btn = QtWidgets.QPushButton("+ Add Item")
+                node._btn_reference = btn
+                btn.show()
+                # Connexion de l'action
+                btn.clicked.connect(lambda path: self.create_and_add(path , current_index.parent()))
+
+                # Injection immédiate dans la vue Qt
+                self.setIndexWidget(current_index, btn)
+                pass
+
+    def create_and_add(self, path: Iterable[str],
+                       parent_index: QtCore.QModelIndex = None):
+        id = random.randint(0, 100)
+        ids = self.model().get_ids(parent_index)
+        while id in ids:
+            id = random.randint(0, 100)
+        element = seq_factory.get_seq_elt(path[0])(id, dashboard=self._dashboard)
+        self.model().insert_data(parent_index=parent_index,
+                                 row=-1,
+                                 new_object=element)
 
     def edit_row(self):
         index = self.currentIndex()

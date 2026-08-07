@@ -1,7 +1,7 @@
 from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
-from typing import Tuple, Callable, TYPE_CHECKING, Any
+from typing import Tuple, Callable, TYPE_CHECKING, Any, Union
 import weakref
 
 from qtpy import QtCore, QtWidgets
@@ -59,6 +59,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
     """
+    child_added_signal = QtCore.Signal(object, object)
     elt_name = abstract_attribute()
     done_signal = QtCore.Signal(DataToExport)
     params = []
@@ -72,7 +73,9 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     def __repr__(self):
         return f'{self.id} - {self.elt_name.capitalize()}'
 
-    def __init__(self, id: int, **label_kwargs):
+    def __init__(self, id: int,
+                 parent: 'SeqEltBase'=None,
+                 **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
         ParameterManager.__init__(self)
@@ -80,6 +83,9 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         self._id = id
         self._go_to = id + 1
         self._dashboard: 'DashBoard' = None
+        self.parent: 'SeqEltBase' = parent
+
+        self._children = []
 
         font_name = label_kwargs.pop('font_name', 'Tahoma')
         font_size = label_kwargs.pop('font_size', 10)
@@ -87,6 +93,31 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         isitalic = label_kwargs.pop('isitalic', True)
 
         self.font = Font(font_name, font_size, isbold, isitalic)
+
+    @property
+    def children(self) -> list['SeqEltBase']:
+        return self._children
+
+    def __iter__(self):
+        for child in self.children:
+            yield child
+
+    def append_child(self, elt: 'SeqEltBase'):
+        self.children.append(elt)
+        elt.parent = self
+
+    def child(self, index: int) -> Union['SeqEltBase', None]:
+        """ Get the child by its index within the list of children"""
+        if index < len(self.children):
+            return self.children[index]
+        return None
+
+    def child_by_index(self, index: int) -> Union['SeqEltBase', None]:
+        """ Get the child by its unique index """
+        for child in self._children:
+            if child.id == index:
+                return child
+        return None
 
     @property
     def dashboard(self) -> 'DashBoard':

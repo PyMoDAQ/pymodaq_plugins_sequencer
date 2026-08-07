@@ -12,7 +12,8 @@ from pymodaq_gui.utils.menu_utils import MenuButton
 from pymodaq_gui.utils.styling import Font
 from pymodaq_gui.utils.widgets.window import make_window
 
-from pymodaq_plugins_sequencer.utilities.list_widget.model_view import SequenceListView, SequenceModel, SequenceWidgetDelegate
+from pymodaq_plugins_sequencer.utilities.sequencer.model_view import (
+    SequenceTreeView, SequenceModel, SequenceWidgetDelegate, SequenceTreeModel)
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory, SeqEltBase
 
 if TYPE_CHECKING:
@@ -21,9 +22,7 @@ if TYPE_CHECKING:
 seq_factory = SeqEltFactory()
 
 
-
-
-class ListWidget(QtWidgets.QWidget):
+class SequenceWidget(QtWidgets.QWidget):
 
     def __init__(self, parent=None,
                  dashboard: 'DashBoard' = None,
@@ -36,53 +35,33 @@ class ListWidget(QtWidgets.QWidget):
 
         self._dashboard = dashboard
 
-        self.list_view = SequenceListView()
-        self._model = SequenceModel()
-        self.list_view.setModel(self._model)
-
-        self.menu_button = MenuButton('Add Element', seq_factory.elements, update_button_text=False)
-        self.menu_button.triggered.connect(self.create_and_add)
-
-        font = Font('Tahoma', 10, True, False)
-        font.apply_to_widget(self.menu_button)
-        font.apply_to_widget(self.menu_button.add_menu)
+        self.view = SequenceTreeView()
+        self._model = SequenceTreeModel()
+        self.view.setModel(self._model)
 
         self.setup_ui()
 
         for elt in elements:
-            self.add_element(elt)
-
-    def create_and_add(self, path: Iterable[str]):
-        id = random.randint(0, 100)
-        ids = self._model.ids
-        while id in ids:
-            id = random.randint(0, 100)
-        element = seq_factory.get_seq_elt(path[0])(id, dashboard=self._dashboard)
-        self.add_element(element)
-
-    def add_element(self, element: SeqEltBase):
-        row = self._model.rowCount()
-        self._model.add_data(row, element)
+            self._model.insert_data(QtCore.QModelIndex(), -1, elt)
 
     def setup_ui(self):
         self.setLayout(QtWidgets.QVBoxLayout())
         self.layout().setContentsMargins(1,1,1,1)
-        self.layout().addWidget(self.list_view)
-        self.layout().addWidget(self.menu_button)
+        self.layout().addWidget(self.view)
 
         #self.list_view.add_data_signal[str].connect(self.add_subentry)
-        self.list_view.remove_row_signal[int].connect(self._model.remove_data)
-        self.list_view.load_data_signal.connect(self._model.load)
-        self.list_view.save_data_signal.connect(self._model.save)
+        # self.view.remove_row_signal[int].connect(self._model.remove_data)
+        # self.view.load_data_signal.connect(self._model.load)
+        # self.view.save_data_signal.connect(self._model.save)
         self.delegate = SequenceWidgetDelegate()
-        self.list_view.setItemDelegate(self.delegate)
+        #self.view.setItemDelegate(self.delegate)
 
-        self.list_view.setSelectionMode(self.list_view.SelectionMode.ContiguousSelection)
-        self.list_view.setResizeMode(QtWidgets.QListView.ResizeMode.Adjust)
-        self.list_view.setDragEnabled(True)
-        self.list_view.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
-        self.list_view.setAcceptDrops(True)
-        self.list_view.setDragDropMode(self.list_view.DragDropMode.DragDrop)
+        self.view.setSelectionMode(self.view.SelectionMode.ContiguousSelection)
+        self.view.setDragEnabled(True)
+        self.view.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
+        self.view.setAcceptDrops(True)
+        self.view.setDragDropMode(self.view.DragDropMode.DragDrop)
+        self.view.expandAll()
 
 
 if __name__ == '__main__':
@@ -104,7 +83,7 @@ if __name__ == '__main__':
                 seq_factory.get_seq_elt('grab')(5),
                 ]
 
-    list_widget = ListWidget(elements=elements)
+    list_widget = SequenceWidget(elements=elements)
     list_widget.show()
 
     for element in elements:
