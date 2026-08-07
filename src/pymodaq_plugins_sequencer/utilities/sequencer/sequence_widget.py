@@ -54,7 +54,7 @@ class SequenceWidget(QtWidgets.QWidget):
         # self.view.load_data_signal.connect(self._model.load)
         # self.view.save_data_signal.connect(self._model.save)
         self.delegate = SequenceWidgetDelegate()
-        #self.view.setItemDelegate(self.delegate)
+        self.view.setItemDelegate(self.delegate)
 
         self.view.setSelectionMode(self.view.SelectionMode.ContiguousSelection)
         self.view.setDragEnabled(True)

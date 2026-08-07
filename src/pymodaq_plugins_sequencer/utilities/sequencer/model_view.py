@@ -43,7 +43,6 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._editing_index = QModelIndex()
 
     def updateEditorGeometry(self, editor: QtWidgets.QWidget,
                              option: QtWidgets.QStyleOptionViewItem,
@@ -52,25 +51,24 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         if not view:
             return
 
-        # 3. Récupérer la position actuelle du curseur de la souris (Coordonnées globales de l'écran)
-        mouse_global_pos = view.cursor().pos()
-
-        # 4. Définir la taille (largeur/hauteur) basée sur la cellule, mais forcer la position X,Y sur la souris
-        editor.resize(option.rect.width(), option.rect.height())
-
-        # 5. Forcer le déplacement absolu sur l'écran à l'aide de .move()
-        # (L'utilisation directe de setGeometry avec le rectangle parent échoue souvent sur les Popups)
-        editor.move(mouse_global_pos)
+        if index.isValid():
+            elt = index.internalPointer()
+            if elt.name == AddButtonPlaceholder.elt_name:
+                super().updateEditorGeometry(editor, option, index)
+                return
+            else:
+                mouse_global_pos = view.cursor().pos()
+                editor.resize(option.rect.width(), option.rect.height())
+                editor.move(mouse_global_pos)
 
     def createEditor(self, parent, option, index: QModelIndex):
         if not index.isValid():
             return super().createEditor(parent, option, index)
-        self._editing_index = index
-        index.model().layoutChanged.emit()
 
-        seq_elt: SeqEltBase = index.data(QtCore.Qt.ItemDataRole.EditRole)
-
+        seq_elt: SeqEltBase = index.internalPointer()
         if seq_elt:
+            if seq_elt.name == AddButtonPlaceholder.elt_name:
+                return None
             container = QtWidgets.QFrame(parent)
             container.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
             widget = seq_elt.create_widget(container)
@@ -92,22 +90,25 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
     def setEditorData(self, editor, index):
         # Get data from model and populate the custom widget
-        value = index.data(Qt.ItemDataRole.EditRole) or 0
+        pass
 
     def setModelData(self, editor, model, index):
-        # Save the custom widget's state back to the model
-        # value = editor.slider.value()
-        # model.setData(index, value, Qt.ItemDataRole.EditRole)
         pass
 
     def sizeHint(self, option, index):
         """Provide size hint for cells with widgets"""
-        return QtCore.QSize(super().sizeHint(option, index).width(), 40)
+        # 1. Obtenir la largeur de colonne actuelle fournie par Qt (ou 100px par défaut si 0)
+        view_width = option.rect.width() if option.rect.width() > 0 else 100
 
-    def destroyEditor(self, editor, index):
-        self._editing_index = QModelIndex()
-        index.model().layoutChanged.emit()
-        super().destroyEditor(editor, index)
+        if index.isValid():
+            elt = index.internalPointer()
+            if elt and elt.name == AddButtonPlaceholder.elt_name:
+                return QtCore.QSize(view_width, 35)
+            qt_width = super().sizeHint(option, index).width()
+            final_width = qt_width if qt_width > 0 else view_width
+            return QtCore.QSize(final_width, 40)
+        return QtCore.QSize(view_width, 40)
+
 
 class RootNode(SeqEltBase):
     elt_name = 'root'
@@ -510,13 +511,9 @@ class SequenceTreeView(QtWidgets.QTreeView):
     def setModel(self, model: SequenceTreeModel):
         super().setModel(model)
         if model:
-            # RÈGLE 1 : Si le modèle ajoute des lignes (ex: au démarrage ou après un ajout), on applique les boutons
             model.rowsInserted.connect(self._on_rows_inserted)
-
-            # RÈGLE 2 : Dès que l'utilisateur déplie une branche, on force l'application sur les enfants désormais visibles
             self.expanded.connect(self.update_section_buttons)
-
-            # Premier rendu initial pour le niveau racine
+            self.doItemsLayout()
             self.update_section_buttons(QModelIndex())
 
     def _on_rows_inserted(self, parent_index, start, end):
@@ -537,14 +534,19 @@ class SequenceTreeView(QtWidgets.QTreeView):
             if node.name == AddButtonPlaceholder.elt_name:
                 if self.indexWidget(current_index) is not None:
                     continue
+                container = QtWidgets.QWidget(self.viewport())
+                layout = QtWidgets.QHBoxLayout(container)
+                layout.setContentsMargins(0, 0, 0, 0)
+                layout.setSpacing(0)
+
                 btn = QtWidgets.QPushButton("+ Add Item")
-                node._btn_reference = btn
-                btn.show()
-                # Connexion de l'action
+                layout.addWidget(btn)
+                layout.addStretch()
+                node._btn_reference = container
+                container.show()
                 btn.clicked.connect(lambda path: self.create_and_add(path , current_index.parent()))
 
-                # Injection immédiate dans la vue Qt
-                self.setIndexWidget(current_index, btn)
+                self.setIndexWidget(current_index, container)
                 pass
 
     def create_and_add(self, path: Iterable[str],
