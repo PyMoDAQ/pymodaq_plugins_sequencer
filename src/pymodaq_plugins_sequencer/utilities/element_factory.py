@@ -216,7 +216,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         bytes: the remaining bytes string if any
         """
         (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id, dashboard=None)
+        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
         seq_elt.go_to = go_to
         remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
         if seq_elt.children_allowed:
@@ -320,7 +320,7 @@ class SeqEltFactory:
         """
 
         if name not in cls.elements_registry:
-            raise KeyError(f".{name} is not a supported element.")
+            raise KeyError(f"{name} is not a supported element.")
 
         return cls.elements_registry[name]
 

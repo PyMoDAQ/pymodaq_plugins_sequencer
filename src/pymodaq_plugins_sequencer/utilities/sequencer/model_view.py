@@ -121,6 +121,8 @@ class RootElt(SeqEltBase):
     def _eq(self, other: 'SeqEltBase'):
         return True
 
+
+@SeqEltFactory.register_elt()
 class AddButtonPlaceholder(SeqEltBase):
     elt_name = 'button'
     def __init__(self, parent=None):
@@ -129,7 +131,7 @@ class AddButtonPlaceholder(SeqEltBase):
 
     def create_widget(self, parent=None) -> QtWidgets.QWidget:
         return MenuButton('Add Element',
-                          [elt.capitalize() for elt in seq_factory.elements],
+                          [elt.capitalize() for elt in seq_factory.elements if elt != AddButtonPlaceholder.elt_name],
                           update_button_text=False,
                           parent=parent)
 
@@ -139,15 +141,40 @@ class AddButtonPlaceholder(SeqEltBase):
     def execute(self, dte: DataToExport = None):
         self.done_signal.emit(DataToExport('button'))
 
+    def serialize_custom(self) -> bytes:
+        """Serialize the custom part of the element
+
+        to be reimplemented
+        """
+        return b''
+
+    def deserialize_custom(self, bytes_str: bytes) -> bytes:
+        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
+        or methods
+
+        to be reimplemented
+
+        Returns
+        -------
+        bytes: the remaining bytes string if any
+        """
+        return bytes_str
+
 
 class SequenceTreeModel(QtCore.QAbstractItemModel):
     def __init__(self,
                  parent: QtCore.QObject = None,
+                 dashboard: 'Dashboard' = None
                  ):
 
         super().__init__(parent)
         self.root_elt =  RootElt()
         self.insert_data(QtCore.QModelIndex(), 0, AddButtonPlaceholder())
+        self._dashboard = dashboard
+
+    @property
+    def dashboard(self) -> 'Dashboard':
+        return self._dashboard
 
     def index(self, row, column, parent=QModelIndex()):
         if not self.hasIndex(row, column, parent):
@@ -304,21 +331,22 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         if not data.hasFormat(MIME_TYPE):
             return False
 
-        parent_elt = parent.internalPointer() if parent.isValid() else self.root_elt
-
-        # Si le dépôt se fait directement SUR un élément, on ajuste la ligne
         if row == -1:
-            row = parent.row() if parent.isValid() else self.rowCount()
+            row = parent.row() if parent.isValid() else self.rowCount(parent)
 
-        elts: list[SeqEltBase] = (
-            ser_factory.get_apply_deserializer(
-                data.data(MIME_TYPE).data()))
-        # Insertion des nouveaux éléments dans notre structure de données
-        self.beginInsertRows(QModelIndex(), row, row + len(elts) - 1)
-        for i, item in enumerate(elts):
-            self._data.insert(row + i, item)
-            self._checked.insert(row+ i, True)
-        self.endInsertRows()
+        elt: SeqEltBase = ser_factory.get_apply_deserializer(data.data(MIME_TYPE).data())
+        elt.dashboard = self.dashboard
+
+        children: list[SeqEltBase] = []
+        while len(elt.children) > 0:
+            children.append(elt.pop(0))
+        self.insert_data(parent_index=parent, row=row, new_object=elt)
+        new_index = self.index(row, 0, parent)
+        for child in children:
+            child.dashboard = self.dashboard
+            self.insert_data(new_index, -1, child)
+        return True
+
 
 class SequenceModel(QtCore.QAbstractListModel):
 

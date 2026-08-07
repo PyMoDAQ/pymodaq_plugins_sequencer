@@ -36,7 +36,7 @@ class SequenceWidget(QtWidgets.QWidget):
         self._dashboard = dashboard
 
         self.view = SequenceTreeView(parent=parent, dashboard=dashboard)
-        self._model = SequenceTreeModel()
+        self._model = SequenceTreeModel(dashboard=dashboard)
         self.view.setModel(self._model)
 
         self.setup_ui()
