@@ -19,6 +19,8 @@ from pymodaq_gui.utils.widgets import LabelWithFont
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from pymodaq_utils.abstract import abstract_attribute
 from pymodaq_utils.logger import set_logger, get_module_name
+from pymodaq_gui.utils.styling import Font
+
 
 logger = set_logger(get_module_name(__file__))
 
@@ -52,7 +54,6 @@ def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utili
 MIME_TYPE = 'pymodaq/sequence_element'
 
 
-@SerializableFactory.register_decorator()
 class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
@@ -84,14 +85,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         isbold = label_kwargs.pop('isbold', True)
         isitalic = label_kwargs.pop('isitalic', True)
 
-        self.id_widget = LabelWithFont(f'{id}', font_name=font_name,
-                              font_size=font_size, isbold=isbold,
-                              isitalic=isitalic, color=get_theme().blue)
-
-
-        self.name_widget = LabelWithFont(f'{self.name}', font_name=font_name,
-                              font_size=font_size, isbold=isbold,
-                              isitalic=isitalic, color=get_theme().magenta)
+        self.font = Font(font_name, font_size, isbold, isitalic)
 
     @property
     def dashboard(self) -> 'DashBoard':
@@ -99,9 +93,18 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
 
     @dashboard.setter
     def dashboard(self, value: 'Dashboard'):
-        """ To be reimplement if necessary"""
+        """ """
         self._dashboard = value
         self.do_things_with_dashboard()
+
+    def set_dashboard(self, dashboard: 'DashBoard'):
+        self.dashboard = dashboard
+
+    def set_id_visible(self, visible=True):
+        self.id_widget.setVisible(visible)
+
+    def set_name_visible(self, visible=True):
+        self.name_widget.setVisible(visible)
 
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):
@@ -111,23 +114,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
                 return False
         return self._eq(other)
 
-    def _eq(self, other: 'SeqEltBase'):
-        """ Custom method to reimplement to assert two elements are equals"""
-        raise NotImplementedError
-
-    def do_things_with_dashboard(self):
-        """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
-
-        Do whatever is needed to instantiate your element with the Dashboard
-        """
-        pass
-
-    def set_id_visible(self, visible=True):
-        self.id_widget.setVisible(visible)
-
-    def set_name_visible(self, visible=True):
-        self.name_widget.setVisible(visible)
-
     @property
     def id(self):
         return self._id
@@ -135,7 +121,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     @id.setter
     def id(self, value: int):
         self._id = value
-        self.id_widget.setText(str(value))
 
     @property
     def name(self):
@@ -144,7 +129,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     @name.setter
     def name(self, value: str):
         self.elt_name = value
-        self.name_widget.setText(value)
 
     @property
     def go_to(self):
@@ -155,11 +139,30 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     def go_to(self, value: int):
         self._go_to = value
 
-    def _create_base_widget(self) -> WidgetWithToolbar:
+    def _create_base_widget(self, parent) -> WidgetWithToolbar:
         """ Base Widget"""
-        base_widget = WidgetWithToolbar(self.id, self.name)
-        self.add_widget('id', self.id_widget, toolbar=base_widget.toolbar)
-        self.add_widget('name', self.name_widget, toolbar=base_widget.toolbar)
+
+
+        base_widget = WidgetWithToolbar(parent=parent)
+        id_widget = LabelWithFont(f'{self.id}',
+                                  font_name=self.font.font_name,
+                                  font_size=self.font.font_size,
+                                  isbold=self.font.isbold,
+                                  isitalic=self.font.isitalic,
+                                  color=get_theme().blue,
+                                  parent=base_widget)
+
+
+        name_widget = LabelWithFont(f'{self.name}',
+                                    font_name=self.font.font_name,
+                                    font_size=self.font.font_size,
+                                    isbold=self.font.isbold,
+                                    isitalic=self.font.isitalic,
+                                    color=get_theme().magenta,
+                                    parent=base_widget)
+        base_widget.add_widget_top(id_widget)
+        base_widget.add_widget_top(name_widget)
+
         self.add_action('execute', 'Execute', 'start',
                         tip='Execute the Sequencer Element',
                         icon_color=get_theme().magenta,
@@ -183,9 +186,34 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         # super().add_widget(*args, before=before, **kwargs)
         super().add_widget(*args, **kwargs)
 
-    def create_widget(self) -> QtWidgets.QWidget:
+    @classmethod
+    def serialize(cls, obj: 'SeqEltBase') -> bytes:
+        bytes_string = b''
+        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id, obj._go_to))
+        bytes_string += obj.serialize_custom()
+        return bytes_string
+
+    @classmethod
+    def deserialize(cls, bytes_str: bytes) -> Tuple['SeqEltBase', bytes]:
+        """Convert bytes into a SeqEltBase object
+
+        Returns
+        -------
+        SeqEltBase: the decoded object
+        bytes: the remaining bytes string if any
+        """
+        (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id, dashboard=None)
+        seq_elt.go_to = go_to
+        remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
+
+        return seq_elt, remaining_bytes
+
+    def create_widget(self, parent) -> QtWidgets.QWidget:
         """ Public API to be used to create the widget representing this elt """
-        return self._create_widget(self._create_base_widget())
+        return self._create_widget(self._create_base_widget(parent))
+
+    # list of methods to reimplement in real implementations!
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         """ Particular Widget allowing the edition of this Element
@@ -224,29 +252,20 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         """
         raise NotImplementedError
 
+    def _eq(self, other: 'SeqEltBase'):
+        """ Custom method to reimplement to assert two elements are equals"""
+        raise NotImplementedError
 
-    @classmethod
-    def serialize(cls, obj: 'SeqEltBase') -> bytes:
-        bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id, obj._go_to))
-        bytes_string += obj.serialize_custom()
-        return bytes_string
+    def do_things_with_dashboard(self):
+        """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
 
-    @classmethod
-    def deserialize(cls, bytes_str: bytes) -> Tuple['SeqEltBase', bytes]:
-        """Convert bytes into a SeqEltBase object
-
-        Returns
-        -------
-        SeqEltBase: the decoded object
-        bytes: the remaining bytes string if any
+        Do whatever is needed to instantiate your element with the Dashboard
         """
-        (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id, dashboard=None)
-        seq_elt.go_to = go_to
-        remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
+        pass
 
-        return seq_elt, remaining_bytes
+    def size_hint(self) -> QtCore.QSize:
+        """Returns the Size the corresponding widget will likely have"""
+        return QtCore.QSize(200, 50)
 
 
 class SeqEltFactory:

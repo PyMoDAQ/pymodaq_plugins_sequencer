@@ -1,7 +1,8 @@
 from pyqtgraph import mkColor
 from qtpy import QtWidgets
 
-from pymodaq_gui.utils.utils import mkQApp
+
+from pymodaq_gui.utils.styling import Font
 from pymodaq_gui.utils.widgets.label import LabelWithFont
 from pymodaq_gui.managers.action_manager import ActionManager
 from qt_themes import get_theme
@@ -12,17 +13,10 @@ class WidgetWithToolbar(QtWidgets.QWidget):
     subwidgets
     """
 
-    def __init__(self, id: int, name: str, subwidget:QtWidgets.QWidget = None, parent=None,
+    def __init__(self, subwidget:QtWidgets.QWidget = None, parent=None,
                  **label_kwargs):
         QtWidgets.QWidget.__init__(self, parent)
-
-        self._id = id
-        self._name = name
-
-        font_name = label_kwargs.pop('font_name', 'Tahoma')
-        font_size = label_kwargs.pop('font_size', 14)
-        isbold = label_kwargs.pop('isbold', True)
-        isitalic = label_kwargs.pop('isitalic', True)
+        self.font = Font(**label_kwargs)
 
         self.top_widget = QtWidgets.QWidget()
         self.top_widget.setLayout(QtWidgets.QHBoxLayout())
@@ -44,9 +38,9 @@ class WidgetWithToolbar(QtWidgets.QWidget):
         return self.top_widget.layout()
 
     def add_widget_top(self, widget: QtWidgets.QWidget):
-        ind = self.top_widget.layout().count()
-        ind = ind - 1 if ind > 0 else 0
-        self.top_widget.layout().insertWidget(ind, widget)
+        ind = self.top_layout.count()
+        ind = ind - 2 if ind > 1 else 0  # -2 is for the toolbar and the stretch
+        self.top_layout.insertWidget(ind, widget)
 
     def insert_widget(self, widget=QtWidgets.QWidget, ind=1):
         self.layout().insertWidget(ind, widget)
@@ -55,6 +49,7 @@ class WidgetWithToolbar(QtWidgets.QWidget):
 
 
 if __name__ == '__main__':
+    from pymodaq_gui.utils.utils import mkQApp
     from qt_themes import get_theme
     app = mkQApp('WidgetToolbar')
     widget = WidgetWithToolbar(123, 'State')

@@ -43,74 +43,49 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(*args, **kwargs)
 
     def createEditor(self, parent, option, index: QModelIndex):
-        seq_elt: SeqEltBase = index.data()
-        widget = seq_elt.create_widget()
-        widget.setParent(parent)
+        if not index.isValid():
+            return super().createEditor(parent, option, index)
 
-        # Set size policy to fill the cell
-        widget.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Expanding,
-        )
+        seq_elt: SeqEltBase = index.data(QtCore.Qt.ItemDataRole.DisplayRole)
 
-        # Force widget to fill cell height
-        # available_height = option.rect.height()
-        # widget.setMinimumHeight(available_height)
-        # widget.setMaximumHeight(available_height)
+        if seq_elt:
+            widget = seq_elt.create_widget(parent=parent)
+            if widget.parent() is None:
+                widget.setParent(parent)
 
-        # # Remove layout margins if present
-        # if widget.layout() is not None:
-        #     widget.layout().setContentsMargins(0, 0, 0, 0)
-        #     widget.layout().setSpacing(0)
+            # Set size policy to fill the cell
+            widget.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Expanding,
+            )
+            return widget
 
-        # Connect signals for auto-commit on value change or focus loss
-        #self._connect_editor_signals(widget)
+        return super().createEditor(parent, option, index)
 
-        return widget
+    def setEditorData(self, editor, index):
+        # Get data from model and populate the custom widget
+        value = index.data(Qt.ItemDataRole.DisplayRole) or 0
 
-    def _connect_editor_signals(self, widget):
-        """Connect widget signals to auto-commit data changes"""
-        # Try common value changed signals
-        # if hasattr(widget, 'toggled'):
-        #     widget.toggled.connect(lambda: self.commitData.emit(widget))
-        # if hasattr(widget, 'currentIndexChanged'):  # For comboboxes
-        #     widget.currentIndexChanged.connect(lambda: self.value_changed(widget))
-        # elif hasattr(widget, 'editingFinished'):
-        #     widget.editingFinished.connect(lambda: self.value_changed(widget))
-        # elif hasattr(widget, 'stateChanged'):  # For checkboxes
-        #     widget.stateChanged.connect(lambda: self.commitData.emit(widget))
-        # elif hasattr(widget, 'checkStateChanged'):  # For checkboxes
-        #     widget.checkStateChanged.connect(lambda: self.commitData.emit(widget))
-        #
-        # Install event filter to catch focus loss
-        widget.installEventFilter(self)
+    def setModelData(self, editor, model, index):
+        # Save the custom widget's state back to the model
+        # value = editor.slider.value()
+        # model.setData(index, value, Qt.ItemDataRole.EditRole)
         pass
 
-    def value_changed(self, widget: QtWidgets.QWidget):
-        QtWidgets.QApplication.processEvents()
-        self.commitData.emit(widget)
-
-    def setEditorData(self, editor: SeqEltBase, index: QModelIndex):
-        try:
-            super().setEditorData(editor, index)
-        except:
-            super().setEditorData(editor, index)
-
-    def setModelData(self, editor, model, index: QModelIndex):
-        pass
-        #model.setData(index, copy.copy(editor.value()), Qt.ItemDataRole.EditRole)
-
-    # def updateEditorGeometry(self, editor, option, index):
-    #     """Ensure editor fills the cell completely"""
-    #     rect = QtCore.QRect(option.rect)
-    #     available_height = rect.height()
-    #     editor.setMinimumHeight(available_height)
-    #     editor.setMaximumHeight(available_height)
-    #     editor.setGeometry(rect)
+    def updateEditorGeometry(self, editor, option, index):
+        # Force the custom widget to fit the row dimensions
+        editor.setGeometry(option.rect)
 
     def sizeHint(self, option, index):
         """Provide size hint for cells with widgets"""
-        return QtCore.QSize(100, 60)
+        if not index.isValid():
+            return super().sizeHint(option, index)
+
+        seq_elt = index.data(QtCore.Qt.ItemDataRole.DisplayRole)
+        if seq_elt and hasattr(seq_elt, 'size_hint'):
+            return seq_elt.size_hint()
+
+        return super().sizeHint(option, index)
 
 
 class SequenceModel(QtCore.QAbstractListModel):
@@ -120,7 +95,7 @@ class SequenceModel(QtCore.QAbstractListModel):
     def __init__(self, parent: QtWidgets.QWidget = None,
                  data: list[SeqEltBase] = None,
                  header=('Elt',),
-                 show_checkbox = True
+                 show_checkbox = False
                  ):
 
         if data is None:
@@ -156,8 +131,10 @@ class SequenceModel(QtCore.QAbstractListModel):
 
     def data(self, index: QModelIndex, role: Qt.ItemDataRole) -> Any:
         if index.isValid():
-            if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 return self._data[index.row()]
+            elif role == Qt.ItemDataRole.EditRole:
+                return None
             elif role == Qt.ItemDataRole.CheckStateRole and index.column() == 0 and self._show_checkbox:
                 if self._checked[index.row()]:
                     return Qt.CheckState.Checked
@@ -166,55 +143,60 @@ class SequenceModel(QtCore.QAbstractListModel):
             elif role == Qt.ItemDataRole.ToolTipRole:
                 entry: SeqEltBase = self._data[index.row()]
                 return repr(entry)
-        return QVariant()
+        return None
 
     def flags(self, index):
+        default_flags = super().flags(index)
+        if index.isValid():
+            return (default_flags |
+                    Qt.ItemFlag.ItemIsEnabled |
+                    Qt.ItemFlag.ItemIsSelectable |
+                    Qt.ItemFlag.ItemIsDragEnabled |
+                    Qt.ItemFlag.ItemIsEditable)
+        else:
+            return default_flags | Qt.ItemFlag.ItemIsDropEnabled
 
-        return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsEditable
+    def supportedDropActions(self):
+        return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
 
     def dropMimeData(self, data: QMimeData, action: Qt.DropAction, row: int, column: int, parent: QModelIndex):
-        if row == -1:
-            row = self.rowCount(parent)
-        if data.hasFormat(MIME_TYPE):
-            elts: list[SeqEltBase] = (
-                ser_factory.get_apply_deserializer(
-                    data.data(MIME_TYPE).data()))
-        else:
-            elts = []
+        if action == Qt.DropAction.IgnoreAction:
+            return True
 
-        if action == QtCore.Qt.DropAction.MoveAction:
-            pass
-            # this is strange if I move things around using drag/drop
-            # sometimes the MoveRows is called immediately without calling drop???
-            # the code below is therefore not needed (but is still called in case of a drop!!)
-            # for ind, entry in enumerate(elts):
-            #     self.data_tmp = entry
-            #     start_row = self._data.index(entry)
-            #     #self.moveRows(start_row, len(elts))
-            #     self.moveRow(parent, start_row, parent, row)
-        elif action == QtCore.Qt.DropAction.CopyAction:  #but only one item in the list in Copy mode
-            self.data_tmp = elts
-            for entry in self.data_tmp:  #make sure there is no duplicate
-                if entry in self._data:
-                    self.data_tmp.remove(entry)
-            self.insertRows(row, len(self.data_tmp), parent)
-        self.update_delegate.emit()
+        if not data.hasFormat(MIME_TYPE):
+            return False
+
+        # Si le dépôt se fait directement SUR un élément, on ajuste la ligne
+        if row == -1:
+            row = parent.row() if parent.isValid() else self.rowCount()
+
+        elts: list[SeqEltBase] = (
+            ser_factory.get_apply_deserializer(
+                data.data(MIME_TYPE).data()))
+        # Insertion des nouveaux éléments dans notre structure de données
+        self.beginInsertRows(QModelIndex(), row, row + len(elts) - 1)
+        for i, item in enumerate(elts):
+            self._data.insert(row + i, item)
+            self._checked.insert(row+ i, True)
+        self.endInsertRows()
+
         return True
 
     def setData(self, index, value, role):
         if index.isValid():
             if role == Qt.ItemDataRole.EditRole:
-                if self.validate_data(index.row(), index.column(), value):
-                    #TODO self._data[index.row()].setting.parameter.setValue(value)
-                    self.dataChanged.emit(index, index, [role])
-                    return True
-                else:
-                    return False
+                self._data[index.row()] = value
+                self.dataChanged.emit(index, index, [role])
+                return True
+
             elif role == Qt.ItemDataRole.CheckStateRole:
                 self._checked[index.row()] = True if value == Qt.CheckState.Checked else False
                 self.dataChanged.emit(index, index, [role])
                 return True
         return False
+
+    def validate_data(self, row, col, data: QMimeData):
+        pass
 
     def moveRow(self, sourceParent: QModelIndex, sourceRow: int,
                 destinationParent: QModelIndex, destinationChild: int) -> bool:
@@ -232,18 +214,18 @@ class SequenceModel(QtCore.QAbstractListModel):
     def moveRows(self, sourceParent: QModelIndex, sourceRow: int, count: int,
                  destinationParent: QModelIndex, destinationChild: int) -> bool:
         if count == 1:
-            self.moveRow(sourceParent, sourceRow, destinationParent, destinationChild)
+            return self.moveRow(sourceParent, sourceRow, destinationParent, destinationChild)
         else:
-            super().moveRows(sourceParent, sourceRow, count,
-                             destinationParent, destinationChild)
+            return super().moveRows(sourceParent, sourceRow, count,
+                                    destinationParent, destinationChild)
 
-    def insertRows(self, row, count, parent):
-        self.beginInsertRows(QtCore.QModelIndex(), row, row + count - 1)
-        for ind in range(count):
-            self._data.insert(row + ind, self.data_tmp[ind] if
-            (hasattr(self.data_tmp, '__len__') and len(self.data_tmp) == count) else self.data_tmp)
-            self._checked.insert(row + ind, False)
-        self.endInsertRows()
+    def removeRows(self, row, count, parent=QModelIndex()):
+        self.beginRemoveRows(parent, row, row + count - 1)
+        for _ in range(count):
+            if row < len(self._data):
+                del self._data[row]
+                del self._checked[row]
+        self.endRemoveRows()
         return True
 
     def clear(self):
@@ -285,12 +267,20 @@ class SequenceModel(QtCore.QAbstractListModel):
             self.update_delegate.emit()
 
     def insert_data(self, row, data):
-        self.data_tmp = data
-        self.insertRows(row, 1, self.index(-1, -1))
+        self.beginInsertRows(self.index(-1, -1), row, row+1)
+        self._data.insert(row, data)
+        self._checked.insert(row, True)
+        self.endInsertRows()
 
     def remove_data(self, row):
         self.remove_row(row)
         self.update_delegate.emit()
+
+    def remove_row(self, row: int):
+        self.beginRemoveRows(self.index(row), row, row)
+        self._data.pop(row)
+        self._checked.pop(row)
+        self.endRemoveRows()
 
     def load(self, fname: str | Path = None):
         if fname is None:
@@ -322,7 +312,7 @@ class SequenceListView(QtWidgets.QListView):
     load_data_signal = QtCore.Signal()
     save_data_signal = QtCore.Signal()
 
-    def __init__(self, menu=False):
+    def __init__(self, menu=True):
         super().__init__()
         self.setmenu(menu)
         #self.doubleClicked.connect(self.edit_row)

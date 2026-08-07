@@ -24,6 +24,7 @@ if __name__ == "__main__":
         widgets.append(elements[-1].create_widget())
         widgets[-1].show()
         elements[-1].done_signal.connect(print_dte)
+        print(widgets[-1].sizeHint())
 
     shared_ui.show()
 

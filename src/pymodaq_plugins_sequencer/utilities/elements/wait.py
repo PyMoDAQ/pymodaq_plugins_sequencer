@@ -25,36 +25,36 @@ class WaitElt(SeqEltBase):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.done)
 
-        self._wait_time: int = 0
+        self._wait_time_ms: int = 100
 
     @property
     def wait_time(self) -> int:
-        return self._wait_time
+        return self._wait_time_ms
 
     @wait_time.setter
     def wait_time(self, value: int):
-        self._wait_time = value
+        self._wait_time_ms = value
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
-        self.spin_box = SpinBox(int=False, suffix='s', siPrefix=True)
-        self.add_widget('wait_time', self.spin_box,
-                        tip='wait time',
-                        toolbar=base_widget.toolbar)
-        self.spin_box.editingFinished.connect(self.set_wait_time_from_spinbox)
+        spin_box = SpinBox(parent=base_widget,
+                           value=self.wait_time,
+                           int=True, suffix='ms', siPrefix=False)
+        base_widget.add_widget_top(spin_box)
+        spin_box.sigValueChanged.connect(self.set_wait_time_from_spinbox)
         return base_widget
 
-    def set_wait_time_from_spinbox(self):
-        self.wait_time = self.spin_box.value()
+    def set_wait_time_from_spinbox(self, spinbox: SpinBox):
+        self.wait_time = spinbox.value()
 
     def execute(self, dte: DataToExport = None):
-        self.timer.setInterval(int(self.spin_box.value() * 1000))
+        self.timer.setInterval(int(self.wait_time))
         self.timer.start()
 
     def done(self):
         self.done_signal.emit(
             DataToExport(self.__class__.__name__,
                          data=[DataRaw('wait_time',
-                                       data=[np.atleast_1d(self.spin_box.value())],
+                                       data=[np.atleast_1d(self.wait_time)],
                                        units='s')]))
 
     def serialize_custom(self) -> bytes:

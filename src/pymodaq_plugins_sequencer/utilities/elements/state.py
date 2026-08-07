@@ -1,10 +1,12 @@
+from qtpy import QtCore
+
 from serializall import SerializableFactory
-
-
 
 from pymodaq_data import DataToExport
 
 from pymodaq.utils.managers.state.state_manager import StateManager
+from pymodaq_gui.managers.manager_base import ManagerActions
+from pymodaq_gui.utils.widgets.combo import ComboBox
 
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
@@ -23,18 +25,35 @@ class StateElt(SeqEltBase):
 
         self.state_manager = StateManager()
 
+        self._state = self.state_manager.entry
+
+    @property
+    def state(self) -> str:
+        return self._state
+
+    @state.setter
+    def state(self, value: str):
+        self._state = value
+
+    @QtCore.Slot(str)
+    def set_state(self, value: str):
+        self.state = value
+
     def do_things_with_dashboard(self):
         self.state_manager: 'StateManager' = self.dashboard.state_manager
         self.state_manager.applied_entry.connect(
             lambda: self.done_signal.emit(DataToExport('StateElt')))
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
-        self.state_manager.get_external_toolbar_menu(toolbar=base_widget.toolbar)
-        self.set_action_visible('execute', False)
+        combo = ComboBox(base_widget)
+        combo.set_items(self.state_manager.entries)
+        base_widget.add_widget_top(combo)
+        combo.currentTextChanged.connect(self.set_state)
         return base_widget
 
     def execute(self, dte: DataToExport):
-        pass # no need here as the execution is handled by the State Manager execute action
+        self.state_manager.entry = self.state
+        self.state_manager.execute_entry()
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element

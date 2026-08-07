@@ -35,6 +35,7 @@ class GrabElt(SeqEltBase):
                         checkable=True, icon_checked_color=get_theme().green,
                         toolbar=base_widget.toolbar)
         self.connect_action('show_settings', self.modules_manager.settings_tree.setVisible)
+        self.modules_manager.settings_tree.closeEvent = lambda event: self.set_action_checked('show_settings', False)
         return base_widget
 
     def execute(self, dte: DataToExport=None):
