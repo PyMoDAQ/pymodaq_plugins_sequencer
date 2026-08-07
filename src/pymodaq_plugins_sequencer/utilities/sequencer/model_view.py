@@ -112,7 +112,7 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         return QtCore.QSize(view_width, 40)
 
 
-class RootNode(SeqEltBase):
+class RootElt(SeqEltBase):
     elt_name = 'root'
     def __init__(self, parent=None):
         # Pass a specific string or ID to distinguish it from standard data
@@ -146,7 +146,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
                  ):
 
         super().__init__(parent)
-        self.root_node =  RootNode()
+        self.root_elt =  RootElt()
         self.insert_data(QtCore.QModelIndex(), 0, AddButtonPlaceholder())
 
     def index(self, row, column, parent=QModelIndex()):
@@ -154,7 +154,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             return QModelIndex()
 
         if not parent.isValid():
-            parent_node = self.root_node
+            parent_node = self.root_elt
         else:
             parent_node = parent.internalPointer()
 
@@ -170,7 +170,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         child_node = child.internalPointer()
         parent_node = child_node.parent
 
-        if parent_node == self.root_node:
+        if parent_node == self.root_elt:
             return QModelIndex()
 
         grandparent_node = parent_node.parent
@@ -182,7 +182,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             return 0
 
         if not parent.isValid():
-            parent_node = self.root_node
+            parent_node = self.root_elt
         else:
             parent_node = parent.internalPointer()
 
@@ -215,7 +215,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
     def flags(self, index):
         default_flags = super().flags(index)
         if index.isValid():
-            node = index.internalPointer()
+            node: SeqEltBase = index.internalPointer()
             if node.name == AddButtonPlaceholder.elt_name:
                 return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
             return (default_flags |
@@ -234,7 +234,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         """
         # 1. Retrieve the container object (either the invisible root or a visible object from the view)
         if not parent_index.isValid():
-            parent_object = self.root_node
+            parent_object = self.root_elt
         else:
             parent_object = parent_index.internalPointer()
 
@@ -257,7 +257,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         Inserts a new object using a raw Python parent node instead of a QModelIndex.
         """
         # 1. Generate the QModelIndex for this parent node
-        if parent_node == self.root_node:
+        if parent_node == self.root_elt:
             # The invisible root node has no valid QModelIndex in Qt's eyes
             parent_index = QModelIndex()
         else:
@@ -276,7 +276,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
     def get_ids(self, parent_index: QModelIndex) -> list[int]:
         """ Get the ids of the existing elements"""
         if not parent_index.isValid():
-            parent_elt = self.root_node
+            parent_elt = self.root_elt
         else:
             parent_elt = parent_index.internalPointer()
         return [elt.id for elt in parent_elt]
@@ -292,6 +292,33 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             elt: SeqEltBase = indexes[0].internalPointer()
             data.setData(MIME_TYPE, ser_factory.get_apply_serializer(elt))
         return data
+
+    def dropMimeData(self, data: QMimeData,
+                     action: Qt.DropAction,
+                     row: int,
+                     column: int,
+                     parent: QModelIndex):
+        if action == Qt.DropAction.IgnoreAction:
+            return True
+
+        if not data.hasFormat(MIME_TYPE):
+            return False
+
+        parent_elt = parent.internalPointer() if parent.isValid() else self.root_elt
+
+        # Si le dépôt se fait directement SUR un élément, on ajuste la ligne
+        if row == -1:
+            row = parent.row() if parent.isValid() else self.rowCount()
+
+        elts: list[SeqEltBase] = (
+            ser_factory.get_apply_deserializer(
+                data.data(MIME_TYPE).data()))
+        # Insertion des nouveaux éléments dans notre structure de données
+        self.beginInsertRows(QModelIndex(), row, row + len(elts) - 1)
+        for i, item in enumerate(elts):
+            self._data.insert(row + i, item)
+            self._checked.insert(row+ i, True)
+        self.endInsertRows()
 
 class SequenceModel(QtCore.QAbstractListModel):
 
@@ -618,7 +645,7 @@ class SequenceTreeView(QtWidgets.QTreeView):
             self.model().insert_data(elt_index, 0, AddButtonPlaceholder())
 
     def elt_from_index(self, index: QtCore.QModelIndex) -> SeqEltBase:
-        return index.internalPointer() if index.isValid() else self.model().root_node
+        return index.internalPointer() if index.isValid() else self.model().root_elt
 
     def edit_row(self):
         index = self.currentIndex()
