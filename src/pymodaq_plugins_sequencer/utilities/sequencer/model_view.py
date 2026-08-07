@@ -281,6 +281,18 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             parent_elt = parent_index.internalPointer()
         return [elt.id for elt in parent_elt]
 
+    def mimeTypes(self):
+        types = super().mimeTypes()
+        types.append(MIME_TYPE)
+        return types
+
+    def mimeData(self, indexes: list[QModelIndex]) -> QMimeData:
+        data = QMimeData()
+        if indexes[0].isValid():
+            elt: SeqEltBase = indexes[0].internalPointer()
+            data.setData(MIME_TYPE, ser_factory.get_apply_serializer(elt))
+        return data
+
 class SequenceModel(QtCore.QAbstractListModel):
 
     def __init__(self, parent: QtWidgets.QWidget = None,

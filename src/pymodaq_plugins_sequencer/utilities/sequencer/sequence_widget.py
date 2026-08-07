@@ -56,7 +56,7 @@ class SequenceWidget(QtWidgets.QWidget):
         self.delegate = SequenceWidgetDelegate()
         self.view.setItemDelegate(self.delegate)
 
-        self.view.setSelectionMode(self.view.SelectionMode.ContiguousSelection)
+        self.view.setSelectionMode(self.view.SelectionMode.SingleSelection)
         self.view.setDragEnabled(True)
         self.view.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
         self.view.setAcceptDrops(True)
