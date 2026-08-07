@@ -109,6 +109,10 @@ class StateElt(SeqEltBase):
         return (self.state_manager.entry == other.state_manager.entry and
                 self.state_manager.experiment_filename == other.state_manager.experiment_filename)
 
+    def __repr__(self):
+        return f'{super().__repr__()} - {self.state}'
+
+
     def size_hint(self) -> QtCore.QSize:
         size = super().size_hint()
         return QtCore.QSize(250, size.height())

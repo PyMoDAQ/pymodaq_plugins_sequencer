@@ -44,29 +44,48 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(*args, **kwargs)
         self._editing_index = QModelIndex()
 
+    def updateEditorGeometry(self, editor: QtWidgets.QWidget,
+                             option: QtWidgets.QStyleOptionViewItem,
+                             index: QModelIndex):
+        view = editor.parentWidget()
+        if not view:
+            return
+
+        # 3. Récupérer la position actuelle du curseur de la souris (Coordonnées globales de l'écran)
+        mouse_global_pos = view.cursor().pos()
+
+        # 4. Définir la taille (largeur/hauteur) basée sur la cellule, mais forcer la position X,Y sur la souris
+        editor.resize(option.rect.width(), option.rect.height())
+
+        # 5. Forcer le déplacement absolu sur l'écran à l'aide de .move()
+        # (L'utilisation directe de setGeometry avec le rectangle parent échoue souvent sur les Popups)
+        editor.move(mouse_global_pos)
+
     def createEditor(self, parent, option, index: QModelIndex):
         if not index.isValid():
             return super().createEditor(parent, option, index)
         self._editing_index = index
         index.model().layoutChanged.emit()
-        
+
         seq_elt: SeqEltBase = index.data(QtCore.Qt.ItemDataRole.EditRole)
 
         if seq_elt:
-            widget = seq_elt.create_widget(parent=parent)
-            if widget.parent() is None:
-                widget.setParent(parent)
-
-            widget.setAutoFillBackground(True)
-
-            # Set size policy to fill the cell
-            widget.setSizePolicy(
-                QtWidgets.QSizePolicy.Policy.Expanding,
-                QtWidgets.QSizePolicy.Policy.Expanding,
-            )
-
-
-            return widget
+            container = QtWidgets.QFrame(parent)
+            container.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
+            widget = seq_elt.create_widget(container)
+            container.setObjectName("container")
+            container.setStyleSheet("""
+                #container {
+                    border: 2px solid #888888;
+                    border-radius: 4px;
+                    background-color: palette(window);
+                }
+            """)
+            layout = QtWidgets.QVBoxLayout(container)
+            layout.setContentsMargins(1, 1, 1, 1)
+            layout.addWidget(widget)
+            container.setFocusProxy(widget)
+            return container
 
         return super().createEditor(parent, option, index)
 
@@ -80,20 +99,9 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         # model.setData(index, value, Qt.ItemDataRole.EditRole)
         pass
 
-    def updateEditorGeometry(self, editor, option, index):
-        # Force the custom widget to fit the row dimensions
-        editor.setGeometry(option.rect)
-
     def sizeHint(self, option, index):
         """Provide size hint for cells with widgets"""
-        if not index.isValid():
-            return super().sizeHint(option, index)
-
-        if index == self._editing_index:
-            seq_elt = index.data(QtCore.Qt.ItemDataRole.EditRole)
-            if seq_elt and hasattr(seq_elt, 'size_hint'):
-                return seq_elt.size_hint()
-        return QtCore.QSize(super().sizeHint(option, index).width(), 30)
+        return QtCore.QSize(super().sizeHint(option, index).width(), 40)
 
     def destroyEditor(self, editor, index):
         self._editing_index = QModelIndex()
@@ -117,6 +125,9 @@ class SequenceModel(QtCore.QAbstractListModel):
         self.data_tmp: list[SeqEltBase] = []
 
         super().__init__(parent)
+
+    def double_clicked(self, index: QModelIndex):
+        self._data[index.row()].setup_dialog()
 
     @property
     def ids(self) -> list[int]:

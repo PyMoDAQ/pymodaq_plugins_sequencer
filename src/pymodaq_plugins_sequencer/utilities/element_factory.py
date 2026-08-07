@@ -2,6 +2,7 @@ from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
 from typing import Tuple, Callable, TYPE_CHECKING, Any
+import weakref
 
 from qtpy import QtCore, QtWidgets
 from qtpy.QtWidgets import QWidget
@@ -165,21 +166,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         self.connect_action('execute', self.execute)
         return base_widget
 
-    def add_action(self, *args, **kwargs):
-        if 'execute' in self.actions_names:
-            before = self.get_action('execute')
-        else:
-            before = None
-        super().add_action(*args, before=before, **kwargs)
-
-    def add_widget(self, *args, **kwargs):
-        # if 'execute' in self.actions_names:
-        #     before = self.get_action('execute')
-        # else:
-        #     before = None
-        # super().add_widget(*args, before=before, **kwargs)
-        super().add_widget(*args, **kwargs)
-
     @classmethod
     def serialize(cls, obj: 'SeqEltBase') -> bytes:
         bytes_string = b''
@@ -203,7 +189,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
 
         return seq_elt, remaining_bytes
 
-    def create_widget(self, parent) -> QtWidgets.QWidget:
+    def create_widget(self, parent=None) -> QtWidgets.QWidget:
         """ Public API to be used to create the widget representing this elt """
         return self._create_widget(self._create_base_widget(parent))
 

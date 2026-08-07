@@ -40,15 +40,10 @@ class ListWidget(QtWidgets.QWidget):
         self._model = SequenceModel()
         self.list_view.setModel(self._model)
 
-
-        self.persistent_timer = QtCore.QTimer()
-        self.persistent_timer.setSingleShot(True)
-        self.persistent_timer.setInterval(100)
-
         self.menu_button = MenuButton('Add Element', seq_factory.elements, update_button_text=False)
         self.menu_button.triggered.connect(self.create_and_add)
 
-        font = Font('Tahoma', 14, True, False)
+        font = Font('Tahoma', 10, True, False)
         font.apply_to_widget(self.menu_button)
         font.apply_to_widget(self.menu_button.add_menu)
 
@@ -68,22 +63,10 @@ class ListWidget(QtWidgets.QWidget):
     def add_element(self, element: SeqEltBase):
         row = self._model.rowCount()
         self._model.add_data(row, element)
-        # try:
-        #     self.persistent_timer.timeout.disconnect()
-        # except TypeError:
-        #     pass
-        # self.persistent_timer.timeout.connect(lambda: self.open_single_editor(row))
-        # self.persistent_timer.start()
-
-    def open_single_editor(self, row: int):
-        index = self._model.index(row, 0)
-        if index.isValid():
-            self.list_view.openPersistentEditor(index)
-            self._model.layoutChanged.emit()
 
     def setup_ui(self):
         self.setLayout(QtWidgets.QVBoxLayout())
-        self.layout().setContentsMargins(0,0,0,0)
+        self.layout().setContentsMargins(1,1,1,1)
         self.layout().addWidget(self.list_view)
         self.layout().addWidget(self.menu_button)
 
@@ -93,23 +76,13 @@ class ListWidget(QtWidgets.QWidget):
         self.list_view.save_data_signal.connect(self._model.save)
         self.delegate = SequenceWidgetDelegate()
         self.list_view.setItemDelegate(self.delegate)
-        self.list_view.setUniformItemSizes(False)
+
         self.list_view.setSelectionMode(self.list_view.SelectionMode.ContiguousSelection)
         self.list_view.setResizeMode(QtWidgets.QListView.ResizeMode.Adjust)
         self.list_view.setDragEnabled(True)
         self.list_view.setDefaultDropAction(QtCore.Qt.DropAction.MoveAction)
         self.list_view.setAcceptDrops(True)
         self.list_view.setDragDropMode(self.list_view.DragDropMode.DragDrop)
-
-        self._model.rowsInserted.connect(self.update_view_geometry)
-        self._model.rowsRemoved.connect(self.update_view_geometry)
-        self._model.modelReset.connect(self.update_view_geometry)
-
-        self.list_view.updateGeometries()
-
-    def update_view_geometry(self):
-        self.list_view.updateGeometry()  # Force le layout parent à relire le sizeHint()
-
 
 
 if __name__ == '__main__':

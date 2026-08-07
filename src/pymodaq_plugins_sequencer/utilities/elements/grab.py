@@ -6,6 +6,7 @@ from qtpy import QtCore
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq_data import DataToExport
 from pymodaq_gui.parameter.pymodaq_ptypes.itemselect import ItemSelect
+from pymodaq_gui.utils.widgets import SpinBox
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
@@ -40,7 +41,7 @@ class GrabElt(SeqEltBase):
         item_select.set_value(dict(all_items=self.modules_manager.detectors_name,
                                    selected = self.modules_manager.selected_detectors_name,))
         item_select.itemChanged.connect(self.update_detectors_from_combo)
-        base_widget.top_layout.addWidget(item_select)
+        base_widget.insert_widget(item_select)
         return base_widget
 
     def update_detectors_from_combo(self):
@@ -98,5 +99,4 @@ class GrabElt(SeqEltBase):
         return f'{super().__repr__()} - {self.modules_manager.selected_detectors_name}'
 
     def size_hint(self) -> QtCore.QSize:
-        size = super().size_hint()
-        return QtCore.QSize(250, 100)
+        return QtCore.QSize(250, 250)
