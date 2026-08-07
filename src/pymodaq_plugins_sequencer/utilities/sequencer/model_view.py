@@ -265,10 +265,10 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
             self.insert_data(parent_index, row, new_object)
 
-    @property
-    def ids(self) -> list[int]:
+    def get_ids(self, parent_index: QModelIndex) -> list[int]:
         """ Get the ids of the existing elements"""
-        return [elt.id for elt in self._data]
+        parent_elt = parent_index.internalPointer()
+        return [elt.id for elt in parent_elt]
 
 class SequenceModel(QtCore.QAbstractListModel):
 
@@ -291,10 +291,9 @@ class SequenceModel(QtCore.QAbstractListModel):
         self._data[index.row()].setup_dialog()
 
     @property
-    def get_ids(self, parent_index: QModelIndex) -> list[int]:
+    def ids(self) -> list[int]:
         """ Get the ids of the existing elements"""
-        parent_elt = parent_index.internalPointer()
-        return [elt.id for elt in parent_elt]
+        return [elt.id for elt in self._data]
 
     def rowCount(self, *args, **kwargs):
         return len(self._data)
