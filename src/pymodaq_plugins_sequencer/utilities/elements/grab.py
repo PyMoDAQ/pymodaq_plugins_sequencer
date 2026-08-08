@@ -3,6 +3,7 @@ from serializall import SerializableFactory
 
 from qtpy import QtCore
 
+from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq_data import DataToExport
 from pymodaq_gui.parameter.pymodaq_ptypes.itemselect import ItemSelect
@@ -13,7 +14,7 @@ from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 
 ser_factory = SerializableFactory()
-
+logger = set_logger(get_module_name(__file__))
 
 @SeqEltFactory.register_elt()
 class GrabElt(SeqEltBase):
@@ -24,17 +25,50 @@ class GrabElt(SeqEltBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.modules_manager = ModulesManager()
+        self._detectors: list[str] = []
+        self._selected: list[str] = []
+
         self._items: weakref.ref[ItemSelect] = None
-
-    def do_things_with_dashboard(self):
-        self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
-        self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
-
         for child_name in ('actuators', 'probe_data', 'test_actuator'):
             self.modules_manager.settings.child(child_name).show(False)
         self.modules_manager.settings_tree.setVisible(False)
 
+    @property
+    def detectors(self) -> list[str]:
+        return self._detectors
+
+    @detectors.setter
+    def detectors(self, value: list[str]):
+        self._detectors = value
+
+    @property
+    def selected(self) -> list[str]:
+        return self._selected
+
+    @selected.setter
+    def selected(self, value: list[str]):
+        self._selected = value
+
+    def do_things_with_dashboard(self):
         self.dashboard.experiment_manager.applied_entry.connect(self.update_detectors)
+        self.update_detectors()
+
+    def update_detectors(self):
+        self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
+        self.modules_manager.selected_detectors_name = self.dashboard.modules_manager.detectors_all
+        self.detectors = self.modules_manager.detectors_name
+        self.filter_selected_wrt_manager()
+
+    def filter_selected_wrt_manager(self):
+        """  Filter selected given the presence of the detector in the manager """
+        selected = []
+        for sel in self.selected:
+            if sel in self.modules_manager.detectors_name:
+                selected.append(sel)
+            else:
+                logger.warning(f'Could not select the detector: {sel} as not declared in '
+                               f'the ModulesManager instance/ DashBoard')
+        self.selected = selected
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
         item_select = ItemSelect(hasCheckbox=True, parent=base_widget)
@@ -47,19 +81,18 @@ class GrabElt(SeqEltBase):
 
     def update_detectors_from_combo(self):
         if self._items is not None and self._items() is not None:
-            self.modules_manager.selected_detectors_name = self._items().get_value()['selected']
+            self.selected = self._items().get_value()['selected']
 
     def execute(self, dte: DataToExport=None):
-        self.modules_manager.connect_detectors()
-        dte = self.modules_manager.grab_data()
-        self.modules_manager.connect_detectors(False)
-        self.done_signal.emit(dte)
-
-    def update_detectors(self):
-        self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
-        self.modules_manager.selected_detectors_name = self.dashboard.modules_manager.detectors_all
-        self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
-        self.modules_manager.selected_actuators_name = self.dashboard.modules_manager.actuators_all
+        self.filter_selected_wrt_manager()
+        if len(self.selected) > 0:
+            self.modules_manager.selected_detectors_name = self.selected
+            self.modules_manager.connect_detectors()
+            dte = self.modules_manager.grab_data()
+            self.modules_manager.connect_detectors(False)
+            self.done_signal.emit(dte)
+        else:
+            self.done_signal.emit(DataToExport('GrabElt'))
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element
@@ -84,20 +117,19 @@ class GrabElt(SeqEltBase):
         bytes: the remaining bytes string if any
         """
         detectors, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        selected, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        self.modules_manager.detectors_all = [self.modules_manager.get_mod_from_name(det, ModuleType.Detector)
-                                              for det in detectors]
-        self.modules_manager.selected_detectors_name = selected
+        selected, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
+        self.detectors = detectors
+        self.selected = selected
 
         return remaining_bytes
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""
-        return (self.modules_manager.detectors_name == other.modules_manager.detectors_name and
-                self.modules_manager.selected_detectors_name == other.modules_manager.selected_detectors_name)
+        return (self.detectors == other.detectors and
+                self.selected == other.selected)
 
     def __repr__(self):
-        return f'{super().__repr__()} - {self.modules_manager.selected_detectors_name}'
+        return f'{super().__repr__()} - {self.selected}'
 
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(250, 250)

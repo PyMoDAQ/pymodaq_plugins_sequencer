@@ -54,3 +54,9 @@ class TestElements:
         assert ser_factory.get_apply_deserializer(
             ser_factory.get_apply_serializer(element), only_object=True) == element
 
+        serialized = ser_factory.get_apply_serializer(element)
+        obj, remaining_bytes = ser_factory.get_apply_deserializer(serialized, False)
+        assert obj == element
+        assert remaining_bytes == b''
+
+

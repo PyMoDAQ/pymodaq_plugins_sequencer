@@ -220,7 +220,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         seq_elt.go_to = go_to
         remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
         if seq_elt.children_allowed:
-            children: list[SeqEltBase] = ser_factory.get_apply_deserializer(remaining_bytes, False)
+            children, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
             for child in children:
                 seq_elt.append_child(child)
 

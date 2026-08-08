@@ -98,7 +98,7 @@ class StateElt(SeqEltBase):
         bytes: the remaining bytes string if any
         """
         entry, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        experiment, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        experiment, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         self.state_manager.experiment_filename = experiment
         self.state_manager.entry = entry
 
