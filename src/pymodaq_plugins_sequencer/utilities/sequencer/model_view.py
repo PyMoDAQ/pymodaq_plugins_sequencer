@@ -114,7 +114,7 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
 class RootElt(SeqEltBase):
     elt_name = 'root'
-    def __init__(self, parent=None):
+    def __init__(self, id: int = -1, parent=None):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
         super().__init__(id=-1, parent=parent)
 
@@ -127,7 +127,7 @@ class AddButtonPlaceholder(SeqEltBase):
     elt_name = 'button'
     children_allowed = False
 
-    def __init__(self, parent=None):
+    def __init__(self, id: int = -2, parent=None):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
         super().__init__(id=-2, parent=parent)
 
