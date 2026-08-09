@@ -196,7 +196,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         if not child.isValid():
             return QModelIndex()
 
-        child_elt: SeqEltBase = child.internalPointer()
+        child_elt: SeqEltBase = self.get_elt_from_index(child)
         parent_elt = child_elt.parent
 
         if parent_elt == self.root_elt:
@@ -244,6 +244,14 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             node: SeqEltBase = index.internalPointer()
             if node.name == AddButtonPlaceholder.elt_name:
                 return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            if node.children_allowed:
+                return (default_flags |
+                        Qt.ItemFlag.ItemIsEnabled |
+                        Qt.ItemFlag.ItemIsSelectable |
+                        Qt.ItemFlag.ItemIsDragEnabled |
+                        Qt.ItemFlag.ItemIsEditable |
+                        Qt.ItemFlag.ItemIsDropEnabled)
+
             return (default_flags |
                     Qt.ItemFlag.ItemIsEnabled |
                     Qt.ItemFlag.ItemIsSelectable |
@@ -258,23 +266,20 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         """
         Inserts an instance of SeqEltBase (or real implementation) under the given parent item.
         """
-        # 1. Retrieve the container object (either the invisible root or a visible object from the view)
-        if not parent_index.isValid():
-            parent_object = self.root_elt
-        else:
-            parent_object = parent_index.internalPointer()
+        parent_object = self.get_elt_from_index(parent_index)
+        has_add_button = False
+        for child in parent_object.children:
+            if child.elt_name == AddButtonPlaceholder.elt_name:
+                has_add_button = True
+                break
 
-        if new_object.elt_name == AddButtonPlaceholder.elt_name:
-            # if explicitely inserting it, do not change the row
-            index_to_remove = 0
-        else:
-            index_to_remove = 1
+        index_to_subtract = 1 if has_add_button else 0
 
         # Safety check: If the row position is out of bounds, append to the end of the list
         if row == 0:  # because we are inserting a AddButton
             pass
-        elif row < 0 or row > len(parent_object.children) - index_to_remove:
-            row = len(parent_object.children) - index_to_remove #-1 because we-ve inserted a AddButton
+        elif row < 0 or row > len(parent_object.children) - index_to_subtract:
+            row = len(parent_object.children) - index_to_subtract #-1 because there is a AddButton
 
         self.beginInsertRows(parent_index, row, row)
         new_object.parent = parent_object
@@ -358,10 +363,10 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         while len(elt.children) > 0:
             children.append(elt.children.pop(0))
         self.insert_data(parent_index=parent, row=row, new_object=elt)
-        new_index = self.index(row, 0, parent)
+        parent_index = self.index(row, 0, parent)
         for child in children:
             child.dashboard = self.dashboard
-            self.insert_data(new_index, -1, child)
+            self.insert_data(parent_index, -1, child)
         return True
 
     def get_elt_from_index(self, index: QModelIndex) -> SeqEltBase:
@@ -594,6 +599,7 @@ class SequenceTreeView(QtWidgets.QTreeView):
     def _on_rows_inserted(self, parent_index, start, end):
         """Triggered automatically whenever rows are added to the model."""
         self.update_section_buttons(parent_index)
+        #self.expand(parent_index)
 
     def update_section_buttons(self, parent_index=QModelIndex()):
         """Loops through immediate children of parent_index and injects buttons."""
@@ -601,7 +607,6 @@ class SequenceTreeView(QtWidgets.QTreeView):
         if not model:
             return
 
-        # On ne boucle QUE sur les enfants directs de ce parent pour des raisons de performance
         for row in range(model.rowCount(parent_index)):
             current_index = model.index(row, 0, parent_index)
             elt: SeqEltBase = current_index.internalPointer()
@@ -615,7 +620,7 @@ class SequenceTreeView(QtWidgets.QTreeView):
                 layout.setContentsMargins(0, 0, 0, 0)
                 layout.setSpacing(0)
 
-                btn: MenuButton = elt.create_widget()
+                btn: MenuButton = elt.create_widget(parent=container)
                 btn.setFixedHeight(30)
 
                 btn.setStyleSheet(f"""
@@ -668,7 +673,7 @@ class SequenceTreeView(QtWidgets.QTreeView):
                 """)
                 layout.addWidget(btn)
                 layout.addStretch()
-                elt._btn_reference = container
+                #elt._btn_reference = container
                 container.show()
                 btn.triggered.connect(lambda path: self.create_and_add(path , current_index.parent()))
 

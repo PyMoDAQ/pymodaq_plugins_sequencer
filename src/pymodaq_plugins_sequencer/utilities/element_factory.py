@@ -97,7 +97,11 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     @property
     def parent(self) -> 'SeqEltBase':
         """ Get/Set this element parent"""
-        return self._parent
+        try:
+            return self._parent
+        except RuntimeError as e:
+            pass
+            raise RuntimeError(str(e))
 
     @parent.setter
     def parent(self, value: 'SeqEltBase'):
