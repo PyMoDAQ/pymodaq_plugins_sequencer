@@ -11,7 +11,7 @@ from serializall import SerializableFactory
 
 from pymodaq_data import DataToExport
 from pymodaq_gui.utils import select_file
-from pymodaq_gui.utils.menu_utils import MenuButton
+from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
 from pymodaq_gui.utils.styling import create_font
 from pymodaq_utils.array_manipulation import are_elements_contiguous
 
@@ -275,10 +275,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
         index_to_subtract = 1 if has_add_button else 0
 
-        # Safety check: If the row position is out of bounds, append to the end of the list
-        if row == 0:  # because we are inserting a AddButton
-            pass
-        elif row < 0 or row > len(parent_object.children) - index_to_subtract:
+        if row < 0 or row > len(parent_object.children) - index_to_subtract:
             row = len(parent_object.children) - index_to_subtract #-1 because there is a AddButton
 
         self.beginInsertRows(parent_index, row, row)
@@ -286,6 +283,26 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         parent_object.children.insert(row, new_object)
         self.endInsertRows()
 
+        return True
+
+    def clear(self):
+        """ remove all elements but the AddButton"""
+        self.removeRows(0, len(self.root_elt.children) - 1, parent=QModelIndex())
+
+    def clear_children(self, parent: QModelIndex):
+        while self.rowCount(parent) > 1:
+            self.removeRow(0, parent)
+
+    def removeRow(self, row: int, parent = QModelIndex()):
+        parent_elt = self.get_elt_from_index(parent)
+        child = parent_elt.children[row]
+        if child.name == AddButtonPlaceholder.elt_name:
+            return False
+
+        self.beginRemoveRows(parent, row, row)
+        if row - 1 < len(parent_elt.children):
+            del parent_elt.children[row]
+        self.endRemoveRows()
         return True
 
     def removeRows(self, row, count, parent=QModelIndex()):
@@ -319,13 +336,22 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
                 index = self.createIndex(elt_row, 0, elt)
         return index
 
-    def get_ids(self, parent_index: QModelIndex) -> list[int]:
+    def get_ids(self, parent_elt: SeqEltBase = None) -> list[int]:
         """ Get the ids of the existing elements"""
-        if not parent_index.isValid():
+        ids = []
+        if parent_elt is None:
             parent_elt = self.root_elt
-        else:
-            parent_elt = parent_index.internalPointer()
-        return [elt.id for elt in parent_elt]
+        for child in parent_elt.children:
+            ids.append(child.id)
+            ids.extend(self.get_ids(child))
+        return ids
+
+    def get_new_id(self) -> int:
+        new_id = random.randint(0, 100)
+        ids = self.get_ids()
+        while new_id in ids:
+            new_id = random.randint(0, 100)
+        return new_id
 
     def supportedDropActions(self):
         return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
@@ -356,8 +382,13 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         if row == -1:
             row = parent.row() if parent.isValid() else self.rowCount(parent)
 
+
         elt: SeqEltBase = ser_factory.get_apply_deserializer(data.data(MIME_TYPE).data())
         elt.dashboard = self.dashboard
+
+        if action == Qt.DropAction.CopyAction:
+            new_id = self.get_new_id()
+            elt.id = new_id
 
         children: list[SeqEltBase] = []
         while len(elt.children) > 0:
@@ -651,7 +682,7 @@ class SequenceTreeView(QtWidgets.QTreeView):
                         left: -8px;
                     }}
                 """)
-                btn.add_menu.setStyleSheet(f"""
+                btn.menu.setStyleSheet(f"""
                     QMenu {{
                         background-color: {get_theme().base};
                         border: 1px solid {get_theme().secondary};
@@ -680,19 +711,21 @@ class SequenceTreeView(QtWidgets.QTreeView):
                 self.setIndexWidget(current_index, container)
                 pass
 
+    def get_new_id(self) -> int:
+        return self.model().get_new_id()
+
     def create_and_add(self, path: Iterable[str],
-                       parent_index: QtCore.QModelIndex = None):
-        id = random.randint(0, 100)
-        ids = self.model().get_ids(parent_index)
-        while id in ids:
-            id = random.randint(0, 100)
-        element = seq_factory.get_seq_elt(path[0].lower())(id,)
+                       parent_index: QtCore.QModelIndex = None,
+                       row: int = -1):
+
+        new_id = self.get_new_id()
+        element = seq_factory.get_seq_elt(path[0].lower())(new_id,)
         element.dashboard = self.dashboard
         self.model().insert_data(parent_index=parent_index,
-                                 row=-1,
+                                 row=row,
                                  new_object=element)
         parent_elt = self.elt_from_index(parent_index)
-        elt_index = self.model().index(len(parent_elt.children) - 2, 0, parent_index)
+        elt_index = self.model().index(row if row != -1 else len(parent_elt.children) - 2, 0, parent_index)
         if element.children_allowed:
             self.model().insert_data(elt_index, 0, AddButtonPlaceholder())
 
@@ -706,33 +739,40 @@ class SequenceTreeView(QtWidgets.QTreeView):
     def setmenu(self, status):
         if status:
             self.menu = QtWidgets.QMenu()
-            special_menu = self.menu.addMenu('Add Special Configuration')
-
+            self.menu.addMenu(IterableMenu('Add Element',
+                                           seq_factory.elements,
+                                           self.add_element))
             self.menu.addSeparator()
-            self.menu.addAction('Remove selected row', self.remove)
-            self.menu.addAction('Clear all', self.clear)
+            self.menu.addAction('Remove Element', self.remove)
+            self.menu.addAction('Clear Children', self.clear_children)
             self.menu.addSeparator()
             self.menu.addAction('Load Sequencer file', lambda: self.load_data_signal.emit())
             self.menu.addAction('Save Sequencer file', lambda: self.save_data_signal.emit())
         else:
             self.menu = None
 
-    def create_menu_slot_special_entry(self, entry: str):
-        return lambda: self.add(entry)
+    def add_element(self, name: str, path:tuple[str] = ()):
+        current_elt = self.model().get_elt_from_index(self.currentIndex())
+        if current_elt.children_allowed:
+            self.create_and_add(path, self.currentIndex(), row=0)
+        else:
+            self.create_and_add(path, self.currentIndex().parent(), self.currentIndex().row() + 1)
 
     def contextMenuEvent(self, event):
         if self.menu is not None:
             self.menu.exec(event.globalPos())
 
-    def clear(self):
-        self.model().clear()
+    def clear_children(self):
+        current_elt = self.model().get_elt_from_index(self.currentIndex())
+        if current_elt.children_allowed:
+            self.model().clear_children(self.currentIndex())
+        else:
+            self.model().clear_children(self.currentIndex().parent())
 
     def remove(self):
-        """ Remove selected rows, starting from the last one (to not mess with indexing)"""
-        rows = list(set([index.row() for index in self.selectedIndexes()]))
-        rows.sort(key=lambda row: -row)
-        for row in rows:
-            self.remove_row_signal.emit(row)
+        """ Remove selected elements, only one at the time otherwise will mess with indexing"""
+        for index in self.selectedIndexes():
+            self.model().removeRow(index.row(), parent=self.model().parent(index))
 
     def sizeHint(self):
         # Taille de base si le modèle est vide
