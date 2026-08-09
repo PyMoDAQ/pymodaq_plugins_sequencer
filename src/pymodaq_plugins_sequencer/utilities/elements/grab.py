@@ -99,8 +99,8 @@ class GrabElt(SeqEltBase):
 
         to be reimplemented
         """
-        detectors = self.modules_manager.detectors_name
-        selected = self.modules_manager.selected_detectors_name
+        detectors = self.detectors
+        selected = self.selected
 
         bytes = ser_factory.get_apply_serializer(detectors)
         bytes += ser_factory.get_apply_serializer(selected)

@@ -4,6 +4,8 @@ from qtpy import QtCore
 from qt_themes import get_theme
 from serializall import SerializableFactory
 
+from pymodaq_utils.logger import set_logger, get_module_name
+
 from pymodaq_data import DataToExport
 from pymodaq.utils.managers.state.state_manager import StateManager
 from pymodaq_gui.managers.manager_base import ManagerActions
@@ -14,6 +16,7 @@ from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithTo
 
 
 ser_factory = SerializableFactory()
+logger = set_logger(get_module_name(__file__))
 
 
 @SeqEltFactory.register_elt()
@@ -27,7 +30,10 @@ class StateElt(SeqEltBase):
 
         self.state_manager = StateManager()
 
-        self._state = self.state_manager.entry
+        self._state: str = self.state_manager.entry
+        self._states: list[str] = self.state_manager.entries
+        self._experiment: str = self.state_manager.experiment_filename
+
         self._combo: weakref.ref[ComboBox] | None = None  # weakref to the combobox holding the states
 
     @property
@@ -39,10 +45,26 @@ class StateElt(SeqEltBase):
         self._state = value
 
     @property
-    def states(self) -> list[str]:
-        return self.state_manager.entries[:]
+    def experiment(self) -> str:
+        return self._experiment
 
-    def update_states(self):
+    @experiment.setter
+    def experiment(self, value: str):
+        self._experiment = value
+
+    @property
+    def states(self) -> list[str]:
+        return self._states
+
+    @states.setter
+    def states(self, values: list[str]):
+        self._states = values
+        self.update_combo_states()
+
+    def set_states(self, values: list[str]):
+        self.states = values
+
+    def update_combo_states(self):
         if self._combo is not None and self._combo() is not None:
             self._combo().set_items(self.states)
 
@@ -54,8 +76,20 @@ class StateElt(SeqEltBase):
         self.state_manager: 'StateManager' = self.dashboard.state_manager
         self.state_manager.applied_entry.connect(
             lambda: self.done_signal.emit(DataToExport('StateElt')))
-        self.state_manager.new_entry.connect(self.update_states)
+        self.state_manager.new_entry.connect(self.set_states)
+        self.update_states()
 
+    def update_states(self):
+        self.states = self.state_manager.entries
+        self.experiment = self.state_manager.experiment_filename
+        self.filter_state_wrt_manager()
+
+    def filter_state_wrt_manager(self):
+        """  Filter selected given the presence of the detector in the manager """
+        if self.state not in self.state_manager.entries:
+            self.state = 'default'
+            logger.warning(f'Could not select this state: {self.state} as not declared in '
+                               f'the StateManager instance of the DashBoard')
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
 
@@ -83,8 +117,9 @@ class StateElt(SeqEltBase):
 
         to be reimplemented
         """
-        bytes = ser_factory.get_apply_serializer(self.state_manager.entry)
+        bytes = ser_factory.get_apply_serializer(self.state)
         bytes += ser_factory.get_apply_serializer(self.state_manager.experiment_filename)
+        bytes += ser_factory.get_apply_serializer(self.states)
         return bytes
 
     def deserialize_custom(self, bytes_str: bytes) -> bytes:
@@ -97,10 +132,12 @@ class StateElt(SeqEltBase):
         -------
         bytes: the remaining bytes string if any
         """
-        entry, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        state, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
         experiment, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.state_manager.experiment_filename = experiment
-        self.state_manager.entry = entry
+        states, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
+        self.experiment = experiment
+        self.states = states
+        self.state = state
 
         return remaining_bytes
 
