@@ -74,7 +74,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         return f'{self.id} - {self.elt_name.capitalize()}'
 
     def __init__(self, id: int,
-                 parent: 'SeqEltBase'=None,
+                 parent: 'SeqEltBase'= None,
                  **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
@@ -83,7 +83,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         self._id = id
         self._go_to = id + 1
         self._dashboard: 'DashBoard' = None
-        self.parent: 'SeqEltBase' = parent
+        self._parent: 'SeqEltBase' = parent
 
         self._children = []
 
@@ -93,6 +93,19 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
         isitalic = label_kwargs.pop('isitalic', True)
 
         self.font = Font(font_name, font_size, isbold, isitalic)
+
+    @property
+    def parent(self) -> 'SeqEltBase':
+        """ Get/Set this element parent"""
+        return self._parent
+
+    @parent.setter
+    def parent(self, value: 'SeqEltBase'):
+        self._parent = value
+
+    def set_parent(self, value: 'SeqEltBase'):
+        """ to be used as a slot or ..."""
+        self.parent = value
 
     @property
     def children(self) -> list['SeqEltBase']:
@@ -165,7 +178,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     def go_to(self, value: int):
         self._go_to = value
 
-    def _create_base_widget(self, parent) -> WidgetWithToolbar:
+    def _create_base_widget(self, parent: QtWidgets.QWidget) -> WidgetWithToolbar:
         """ Base Widget"""
 
 
@@ -226,7 +239,7 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
 
         return seq_elt, remaining_bytes
 
-    def create_widget(self, parent=None) -> QtWidgets.QWidget:
+    def create_widget(self, parent: QtWidgets.QWidget = None) -> QtWidgets.QWidget:
         """ Public API to be used to create the widget representing this elt """
         return self._create_widget(self._create_base_widget(parent))
 
