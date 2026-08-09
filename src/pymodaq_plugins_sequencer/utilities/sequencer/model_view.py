@@ -125,6 +125,8 @@ class RootElt(SeqEltBase):
 @SeqEltFactory.register_elt()
 class AddButtonPlaceholder(SeqEltBase):
     elt_name = 'button'
+    children_allowed = False
+
     def __init__(self, parent=None):
         # Pass a specific string or ID to distinguish it from standard data
         super().__init__(id=-2, parent=parent)
@@ -181,41 +183,38 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             return QModelIndex()
 
         if not parent.isValid():
-            parent_node = self.root_elt
+            parent_elt = self.root_elt
         else:
-            parent_node = parent.internalPointer()
+            parent_elt = parent.internalPointer()
 
-        child_node = parent_node.children[row]
-        if child_node:
-            return self.createIndex(row, column, child_node)
+        child_elt = parent_elt.children[row]
+        if child_elt:
+            return self.createIndex(row, column, child_elt)
         return QModelIndex()
 
-    def parent(self, child: QModelIndex):
+    def parent(self, child: QModelIndex) -> QModelIndex:
         if not child.isValid():
             return QModelIndex()
 
-        child_node = child.internalPointer()
-        parent_node = child_node.parent
+        child_elt: SeqEltBase = child.internalPointer()
+        parent_elt = child_elt.parent
 
-        if parent_node == self.root_elt:
+        if parent_elt == self.root_elt:
             return QModelIndex()
 
-        grandparent_node = parent_node.parent
-        row = grandparent_node.children.index(parent_node)
-        return self.createIndex(row, 0, parent_node)
+        grandparent_elt = parent_elt.parent
+        row = grandparent_elt.children.index(parent_elt)
+        return self.createIndex(row, 0, parent_elt)
 
     def rowCount(self, parent=QModelIndex()):
         if parent.column() > 0:
             return 0
 
-        if not parent.isValid():
-            parent_node = self.root_elt
-        else:
-            parent_node = parent.internalPointer()
+        parent_elt = self.get_elt_from_index(parent)
 
-        if parent_node is None:
+        if parent_elt is None:
             return 0
-        return len(parent_node.children)
+        return len(parent_elt.children)
 
     def columnCount(self, parent=QModelIndex()):
         return 1
@@ -265,11 +264,17 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         else:
             parent_object = parent_index.internalPointer()
 
+        if new_object.elt_name == AddButtonPlaceholder.elt_name:
+            # if explicitely inserting it, do not change the row
+            index_to_remove = 0
+        else:
+            index_to_remove = 1
+
         # Safety check: If the row position is out of bounds, append to the end of the list
         if row == 0:  # because we are inserting a AddButton
             pass
-        elif row < 0 or row > len(parent_object.children) -1:
-            row = len(parent_object.children) -1 #-1 because we-ve inserted a AddButton
+        elif row < 0 or row > len(parent_object.children) - index_to_remove:
+            row = len(parent_object.children) - index_to_remove #-1 because we-ve inserted a AddButton
 
         self.beginInsertRows(parent_index, row, row)
         new_object.parent = parent_object
@@ -278,27 +283,36 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
         return True
 
-    def insert_data_by_node(self, parent_node: SeqEltBase,
+    def removeRows(self, row, count, parent=QModelIndex()):
+        parent_elt = self.get_elt_from_index(parent)
+
+        self.beginRemoveRows(parent, row, row + count - 1)
+        if row + count - 1 < len(parent_elt.children):
+            del parent_elt.children[row: row + count]
+        self.endRemoveRows()
+        return True
+
+    def insert_data_by_elt(self, parent_elt: SeqEltBase,
                             row: int, new_object: SeqEltBase) -> bool:
         """
         Inserts a new object using a raw Python parent node instead of a QModelIndex.
         """
-        # 1. Generate the QModelIndex for this parent node
-        if parent_node == self.root_elt:
-            # The invisible root node has no valid QModelIndex in Qt's eyes
-            parent_index = QModelIndex()
+        parent_index = self.index_from_element(parent_elt)
+        if parent_index.isValid():
+            self.insert_data(parent_index, row, new_object)
+
+    def index_from_element(self, elt: SeqEltBase) -> QModelIndex:
+        if elt == self.root_elt:
+            index = QModelIndex()
         else:
             # To create the index, we need to know which row the parent occupies inside ITS own parent
-            grandparent: SeqEltBase = parent_node.parent
-            if grandparent is None:
-                # Fallback safety if the parent node is detached
-                parent_index = QModelIndex()
+            parent: SeqEltBase = elt.parent
+            if parent is None:
+                index = QModelIndex()
             else:
-                parent_row = grandparent.children.index(parent_node)
-                # Create the valid Qt index pointing to our parent node
-                parent_index = self.createIndex(parent_row, 0, parent_node)
-
-            self.insert_data(parent_index, row, new_object)
+                elt_row = parent.children.index(elt)
+                index = self.createIndex(elt_row, 0, elt)
+        return index
 
     def get_ids(self, parent_index: QModelIndex) -> list[int]:
         """ Get the ids of the existing elements"""
@@ -307,6 +321,9 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         else:
             parent_elt = parent_index.internalPointer()
         return [elt.id for elt in parent_elt]
+
+    def supportedDropActions(self):
+        return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
 
     def mimeTypes(self):
         types = super().mimeTypes()
@@ -339,7 +356,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
         children: list[SeqEltBase] = []
         while len(elt.children) > 0:
-            children.append(elt.pop(0))
+            children.append(elt.children.pop(0))
         self.insert_data(parent_index=parent, row=row, new_object=elt)
         new_index = self.index(row, 0, parent)
         for child in children:
@@ -347,6 +364,8 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             self.insert_data(new_index, -1, child)
         return True
 
+    def get_elt_from_index(self, index: QModelIndex) -> SeqEltBase:
+        return index.internalPointer() if index.isValid() else self.root_elt
 
 class SequenceModel(QtCore.QAbstractListModel):
 

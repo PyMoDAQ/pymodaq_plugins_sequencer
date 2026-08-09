@@ -66,8 +66,8 @@ class SequenceWidget(QtWidgets.QWidget):
 
 if __name__ == '__main__':
     import sys
-    app = mkQApp('MenuButton')
-    window, area = make_window(title='ListWidget')
+    app = mkQApp('Sequencer')
+    window, area = make_window(title='SequenceWidget')
 
     shared_ui_dash, dashboard = create_load_dashboard(show_dashboard=True)
 
