@@ -1,7 +1,8 @@
 from pathlib import Path
 import random
-from typing import Any, Union, Iterable, TYPE_CHECKING
+from typing import Any, Iterable, TYPE_CHECKING
 
+from qtpy.QtWidgets import QStyle
 from qtpy import QtWidgets, QtCore
 
 from qtpy.QtCore import QModelIndex, QMimeData, Qt
@@ -12,12 +13,10 @@ from serializall import SerializableFactory
 from pymodaq_data import DataToExport
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
-from pymodaq_gui.utils.styling import create_font
 from pymodaq_utils.array_manipulation import are_elements_contiguous
 
-from pymodaq_gui.qvariant import QVariant
-
 from ..element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
+from ..styling import button_style, menu_style, color_from_depth
 from ...utils import get_set_sequencer_path
 
 if TYPE_CHECKING:
@@ -41,10 +40,22 @@ def elements_from_path(fname: Path) -> list[SeqEltBase]:
         data.append(entry)
     return data
 
+def elt_level(index: QModelIndex) -> int:
+    """ Calculate nesting depth of the element with the specified index """
+    depth = 0
+    parent = index.parent()
+    while parent.isValid():
+        depth += 1
+        parent = parent.parent()
+    return depth
+
+
 class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.base_bg = get_theme().mantle
 
     def updateEditorGeometry(self, editor: QtWidgets.QWidget,
                              option: QtWidgets.QStyleOptionViewItem,
@@ -111,6 +122,20 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
             return QtCore.QSize(final_width, 40)
         return QtCore.QSize(view_width, 40)
 
+    def paint(self, painter, option, index):
+        painter.save()
+
+        # Calculate nesting depth
+        depth = elt_level(index)
+
+        level_color = color_from_depth(self.base_bg, depth)
+
+        # Draw level background unless the row is currently highlighted/selected
+        if not (option.state & QStyle.StateFlag.State_Selected):
+            painter.fillRect(option.rect, level_color)
+
+        painter.restore()
+        super().paint(painter, option, index)
 
 class RootElt(SeqEltBase):
     elt_name = 'root'
@@ -654,54 +679,10 @@ class SequenceTreeView(QtWidgets.QTreeView):
                 btn: MenuButton = elt.create_widget(parent=container)
                 btn.setFixedHeight(30)
 
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: transparent;
-                        color: {get_theme().primary};
-                        border: 1px dashed {get_theme().primary};
-                        border-radius: 4px;
-                        font-weight: bold;
-                        font-size: 12px;
-                        text-align: center;
-                    }}
+                depth = elt_level(parent_index) + 1
 
-                    QPushButton:hover {{
-                        background-color: {get_theme().primary}14;
-                        border: 1px solid {get_theme().secondary};
-                        color: {get_theme().secondary};
-                    }}
-
-                    QPushButton:pressed {{
-                        background-color: {get_theme().primary}33;
-                    }}
-
-                    QPushButton::menu-indicator {{
-                        image: none;
-                        subcontrol-position: right center;
-                        subcontrol-origin: padding;
-                        left: -8px;
-                    }}
-                """)
-                btn.menu.setStyleSheet(f"""
-                    QMenu {{
-                        background-color: {get_theme().base};
-                        border: 1px solid {get_theme().secondary};
-                        border-radius: 4px;
-                        padding: 4px;
-                    }}
-                    
-                    QMenu::item {{
-                        background-color: transparent;
-                        color: {get_theme().text};
-                        padding: 6px 20px;
-                        border-radius: 2px;
-                    }}
-                    
-                    QMenu::item:selected {{
-                        background-color: {get_theme().primary};
-                        color: {get_theme().mantle};
-                    }}
-                """)
+                btn.setStyleSheet(button_style(depth))
+                btn.menu.setStyleSheet(menu_style(depth))
                 layout.addWidget(btn)
                 layout.addStretch()
                 #elt._btn_reference = container

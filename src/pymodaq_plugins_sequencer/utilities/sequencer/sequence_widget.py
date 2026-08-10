@@ -62,6 +62,7 @@ class SequenceWidget(QtWidgets.QWidget):
         self.view.setAcceptDrops(True)
         self.view.setDragDropMode(self.view.DragDropMode.DragDrop)
         self.view.expandAll()
+        self.view.setHeaderHidden(True)
 
 
 if __name__ == '__main__':
