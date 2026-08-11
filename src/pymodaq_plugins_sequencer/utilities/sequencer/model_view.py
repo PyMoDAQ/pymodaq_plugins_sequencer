@@ -11,6 +11,7 @@ from qt_themes import get_theme
 from serializall import SerializableFactory
 
 from pymodaq_data import DataToExport
+from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
 from pymodaq_utils.array_manipulation import are_elements_contiguous
@@ -378,6 +379,46 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             new_id = random.randint(0, 100)
         return new_id
 
+    def save_elements(self, file_path: Path) -> None:
+        with open(file_path, 'wb') as f:
+            f.write(ser_factory.get_apply_serializer(self.root_elt))
+
+    def load_elements(self, file_path: Path) -> None:
+        self.clear_children(QModelIndex())
+        with open(file_path, 'rb') as file:
+            root_elt: SeqEltBase = ser_factory.get_apply_deserializer(file.read())
+
+        parent_index = QModelIndex()
+
+        children: list[SeqEltBase] = []
+        while len(root_elt.children) > 0:
+            children.append(root_elt.children.pop(0))
+        for child in children:
+            child.dashboard = self.dashboard
+            self.insert_data(parent_index, -1, child)
+
+    def recursive_insert(self, parent_index: QModelIndex,
+                         elt: SeqEltBase,
+                         row: int = None) -> None:
+
+        if row is None:
+            row = 0
+
+        # 1) remove all children first
+        children: list[SeqEltBase] = []
+        while len(elt.children) > 0:
+            children.append(elt.children.pop(0))
+
+        # 2) insert the elt and affect the Dashbord
+        self.insert_data(parent_index=parent_index, row=row, new_object=elt)
+        elt.dashboard = self.dashboard
+
+        # 3) Check if it has children and call the method on them
+        this_elt_index = self.index(row, 0, parent_index)
+        for ind_row, child in enumerate(children):
+            self.recursive_insert(this_elt_index, child, ind_row)
+
+
     def supportedDropActions(self):
         return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
 
@@ -409,20 +450,13 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
 
         elt: SeqEltBase = ser_factory.get_apply_deserializer(data.data(MIME_TYPE).data())
-        elt.dashboard = self.dashboard
+
 
         if action == Qt.DropAction.CopyAction:
             new_id = self.get_new_id()
             elt.id = new_id
 
-        children: list[SeqEltBase] = []
-        while len(elt.children) > 0:
-            children.append(elt.children.pop(0))
-        self.insert_data(parent_index=parent, row=row, new_object=elt)
-        parent_index = self.index(row, 0, parent)
-        for child in children:
-            child.dashboard = self.dashboard
-            self.insert_data(parent_index, -1, child)
+        self.recursive_insert(parent, elt, row)
         return True
 
     def get_elt_from_index(self, index: QModelIndex) -> SeqEltBase:
@@ -622,19 +656,14 @@ class SequenceModel(QtCore.QAbstractListModel):
             file.writelines([SeqEltBase.serialize(entry) for entry in self._data])
 
 
-class SequenceTreeView(QtWidgets.QTreeView):
+class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
     """
     """
+    def __init__(self, dashboard: 'Dashboard' = None, parent=None):
+        QtWidgets.QTreeView.__init__(self, parent)
+        ActionManager.__init__(self)
 
-    valueChanged = QtCore.Signal(list)
-    add_data_signal = QtCore.Signal(str)
-    remove_row_signal = QtCore.Signal(int)
-    load_data_signal = QtCore.Signal()
-    save_data_signal = QtCore.Signal()
-
-    def __init__(self, menu=True, dashboard: 'Dashboard' = None, parent=None):
-        super().__init__(parent)
-        self.setmenu(menu)
+        self.setup_menu()
         self._dashboard = dashboard
 
     @property
@@ -717,20 +746,40 @@ class SequenceTreeView(QtWidgets.QTreeView):
         index = self.currentIndex()
         index.model().edit_data(index)
 
-    def setmenu(self, status):
-        if status:
-            self.menu = QtWidgets.QMenu()
-            self.menu.addMenu(IterableMenu('Add Element',
-                                           seq_factory.elements,
-                                           self.add_element))
-            self.menu.addSeparator()
-            self.menu.addAction('Remove Element', self.remove)
-            self.menu.addAction('Clear Children', self.clear_children)
-            self.menu.addSeparator()
-            self.menu.addAction('Load Sequencer file', lambda: self.load_data_signal.emit())
-            self.menu.addAction('Save Sequencer file', lambda: self.save_data_signal.emit())
-        else:
-            self.menu = None
+    def setup_menu(self):
+        self.add_menu('add_elements', 'Add Element',
+                      parent_menu=self.menu,
+                      menu=IterableMenu('Add Element',
+                                       seq_factory.elements,
+                                       self.add_element))
+        self.menu.addSeparator()
+        self.add_action('remove', 'Remove Element', menu=self.menu)
+        self.connect_action('remove', self.remove)
+
+        self.add_action('clear_children', 'Clear Children', menu=self.menu)
+        self.connect_action('clear_children', self.clear_children)
+
+        self.menu.addSeparator()
+
+        self.add_action('load_file', 'Load Sequence File', menu=self.menu)
+        self.add_action('save_file', 'Save Sequence File', menu=self.menu)
+
+        self.connect_action('load_file', lambda: self.load_data)
+        self.connect_action('save_file', lambda: self.save_data)
+
+    def load_data(self, path: Path = None):
+        if path is None:
+            path = select_file(get_set_sequencer_path(),
+                               save=False, ext='seq', force_save_extension=True)
+        if path is not None and path != '':
+            self.model().load_elements(path)
+
+    def save_data(self, path: Path = None):
+        if path is None:
+            path = select_file(get_set_sequencer_path(),
+                               save=True, ext='seq', force_save_extension=True)
+        if path is not None and path != '':
+            self.model().save_elements(path)
 
     def add_element(self, name: str, path:tuple[str] = ()):
         current_elt = self.model().get_elt_from_index(self.currentIndex())

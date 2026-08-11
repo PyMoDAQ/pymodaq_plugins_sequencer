@@ -49,10 +49,6 @@ class SequenceWidget(QtWidgets.QWidget):
         self.layout().setContentsMargins(1,1,1,1)
         self.layout().addWidget(self.view)
 
-        #self.list_view.add_data_signal[str].connect(self.add_subentry)
-        # self.view.remove_row_signal[int].connect(self._model.remove_data)
-        # self.view.load_data_signal.connect(self._model.load)
-        # self.view.save_data_signal.connect(self._model.save)
         self.delegate = SequenceWidgetDelegate()
         self.view.setItemDelegate(self.delegate)
 
