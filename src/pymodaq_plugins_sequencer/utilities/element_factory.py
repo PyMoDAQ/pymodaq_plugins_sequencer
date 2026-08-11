@@ -55,7 +55,7 @@ def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utili
 MIME_TYPE = 'pymodaq/sequence_element'
 
 
-class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
+class SeqEltBase(QtCore.QObject, ActionManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
     """
@@ -63,12 +63,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
     done_signal = QtCore.Signal(DataToExport)
     children_allowed = False
     params = []
-
-    def __new__(cls, *args, **kwargs):
-        ser_factory.register_from_type(cls, cls.serialize,
-                                       cls.deserialize)  # implement
-        # serialization/deserialization to all subtypes of SeqEltBase but only when first instantiated hence the decorator
-        return super().__new__(cls)
 
     def __repr__(self):
         return f'{self.id} - {self.elt_name.capitalize()}'
@@ -78,7 +72,6 @@ class SeqEltBase(QtCore.QObject, ActionManager, ParameterManager):
                  **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
-        ParameterManager.__init__(self)
 
         self._id = id
         self._go_to = id + 1

@@ -12,7 +12,7 @@ from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithTo
 
 ser_factory = SerializableFactory()
 
-
+@SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class WaitElt(SeqEltBase):
 

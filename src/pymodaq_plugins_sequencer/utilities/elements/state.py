@@ -18,7 +18,7 @@ from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithTo
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
 
-
+@SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class StateElt(SeqEltBase):
 

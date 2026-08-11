@@ -32,6 +32,11 @@ def test_get_elements():
         assert isinstance(elt, str)
 
 
+def test_all_element_serialized_registered(qtbot):
+    for elt_name in seq_factory.elements:
+        assert seq_factory.get_seq_elt(elt_name) in ser_factory.get_serializables()
+
+
 @pytest.mark.parametrize('elt_name', seq_factory.elements)
 def test_widget_creation(qtbot, elt_name, mock_dashboard):
     id = random.randint(0, 100)

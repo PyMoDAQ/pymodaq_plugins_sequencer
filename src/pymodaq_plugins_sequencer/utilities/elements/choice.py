@@ -3,6 +3,8 @@ import numpy as np
 from pyqtgraph import mkColor
 
 from qtpy import QtWidgets, QtCore
+from serializall import SerializableFactory
+
 
 from pymodaq_data import DataToExport, DataWithAxes, DataRaw
 from pymodaq_gui.utils.widgets import SpinBox
@@ -12,6 +14,7 @@ from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 
 
+@SerializableFactory.register_decorator()
 #@SeqEltFactory.register_elt()
 class ChoiceElt(SeqEltBase):
 

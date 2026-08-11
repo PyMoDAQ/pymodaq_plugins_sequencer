@@ -16,6 +16,8 @@ from pymodaq.utils.managers.modules_manager import ModulesManager
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
 
+
+@SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class GrabElt(SeqEltBase):
 

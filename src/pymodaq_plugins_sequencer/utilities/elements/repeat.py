@@ -16,7 +16,7 @@ from pymodaq.utils.managers.modules_manager import ModulesManager
 
 ser_factory = SerializableFactory()
 
-
+@SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class RepeatElt(SeqEltBase):
 
