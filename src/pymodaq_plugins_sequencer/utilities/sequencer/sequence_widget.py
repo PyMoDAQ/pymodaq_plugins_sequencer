@@ -13,7 +13,7 @@ from pymodaq_gui.utils.styling import Font
 from pymodaq_gui.utils.widgets.window import make_window
 
 from pymodaq_plugins_sequencer.utilities.sequencer.model_view import (
-    SequenceTreeView, SequenceModel, SequenceWidgetDelegate, SequenceTreeModel)
+    SequenceTreeView, SequenceWidgetDelegate, SequenceTreeModel)
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory, SeqEltBase
 
 if TYPE_CHECKING:

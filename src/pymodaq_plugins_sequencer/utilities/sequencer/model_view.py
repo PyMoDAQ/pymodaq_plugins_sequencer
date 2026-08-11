@@ -138,16 +138,28 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         painter.restore()
         super().paint(painter, option, index)
 
+
+@SerializableFactory.register_decorator()
+@SeqEltFactory.register_elt()
 class RootElt(SeqEltBase):
     elt_name = 'root'
+    children_allowed = True
+
     def __init__(self, id: int = -1, parent=None):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
         super().__init__(id=-1, parent=parent)
+
+    def serialize_custom(self) -> bytes:
+        return b''
+
+    def deserialize_custom(self, bytes_str: bytes) -> bytes:
+        return bytes_str
 
     def _eq(self, other: 'SeqEltBase'):
         return True
 
 
+@SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class AddButtonPlaceholder(SeqEltBase):
     elt_name = 'button'
@@ -159,7 +171,9 @@ class AddButtonPlaceholder(SeqEltBase):
 
     def create_widget(self, parent=None) -> QtWidgets.QWidget:
         return MenuButton('Add Element',
-                          [elt.capitalize() for elt in seq_factory.elements if elt != AddButtonPlaceholder.elt_name],
+                          [elt.capitalize() for elt in seq_factory.elements if not
+                          (elt == AddButtonPlaceholder.elt_name or
+                           elt == RootElt.elt_name)],
                           update_button_text=False,
                           parent=parent)
 
@@ -311,11 +325,19 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
         return True
 
-    def clear(self):
+    def clear(self, clear_add=False):
         """ remove all elements but the AddButton"""
-        self.removeRows(0, len(self.root_elt.children) - 1, parent=QModelIndex())
+        if clear_add:
+            count = len(self.root_elt.children)
+        else:
+            count = len(self.root_elt.children) - 1
+        self.removeRows(0, count, parent=QModelIndex())
 
     def clear_children(self, parent: QModelIndex):
+        """ Clear all children of the parent Element (or children of itself if children allowed)
+        BUT the AddButton
+        """
+
         while self.rowCount(parent) > 1:
             self.removeRow(0, parent)
 
@@ -384,23 +406,20 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             f.write(ser_factory.get_apply_serializer(self.root_elt))
 
     def load_elements(self, file_path: Path) -> None:
-        self.clear_children(QModelIndex())
+        self.clear(clear_add=True)
         with open(file_path, 'rb') as file:
             root_elt: SeqEltBase = ser_factory.get_apply_deserializer(file.read())
+        self.recursive_insert(None, root_elt, 0)
 
-        parent_index = QModelIndex()
-
-        children: list[SeqEltBase] = []
-        while len(root_elt.children) > 0:
-            children.append(root_elt.children.pop(0))
-        for child in children:
-            child.dashboard = self.dashboard
-            self.insert_data(parent_index, -1, child)
-
-    def recursive_insert(self, parent_index: QModelIndex,
+    def recursive_insert(self, parent_index: QModelIndex | None,
                          elt: SeqEltBase,
                          row: int = None) -> None:
+        """ Insert this elt adn its children at the specified row of the specified parent index
 
+        If parent_index is not valid => parent is the root elt
+        If it is None, elt is the RootElt (do not insert it, only its children)
+
+        """
         if row is None:
             row = 0
 
@@ -409,15 +428,18 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         while len(elt.children) > 0:
             children.append(elt.children.pop(0))
 
-        # 2) insert the elt and affect the Dashbord
-        self.insert_data(parent_index=parent_index, row=row, new_object=elt)
-        elt.dashboard = self.dashboard
+        # 2) insert the elt and affect the Dashboard
+        if parent_index is not None:
+            self.insert_data(parent_index=parent_index, row=row, new_object=elt)
+            elt.dashboard = self.dashboard
 
         # 3) Check if it has children and call the method on them
-        this_elt_index = self.index(row, 0, parent_index)
+        if parent_index is not None:
+            this_elt_index = self.index(row, 0, parent_index)
+        else:
+            this_elt_index = QModelIndex()
         for ind_row, child in enumerate(children):
             self.recursive_insert(this_elt_index, child, ind_row)
-
 
     def supportedDropActions(self):
         return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
@@ -472,6 +494,7 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
 
         self.setup_menu()
         self._dashboard = dashboard
+        self._current_path: Path = get_set_sequencer_path()
 
     @property
     def dashboard(self) -> 'Dashboard':
@@ -557,7 +580,9 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
         self.add_menu('add_elements', 'Add Element',
                       parent_menu=self.menu,
                       menu=IterableMenu('Add Element',
-                                       seq_factory.elements,
+                                        [elt.capitalize() for elt in seq_factory.elements if
+                                         not (elt == AddButtonPlaceholder.elt_name or
+                                              elt == RootElt.elt_name)],
                                        self.add_element))
         self.menu.addSeparator()
         self.add_action('remove', 'Remove Element', menu=self.menu)
@@ -571,21 +596,25 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
         self.add_action('load_file', 'Load Sequence File', menu=self.menu)
         self.add_action('save_file', 'Save Sequence File', menu=self.menu)
 
-        self.connect_action('load_file', lambda: self.load_data)
-        self.connect_action('save_file', lambda: self.save_data)
+        self.connect_action('load_file', lambda: self.load_data())
+        self.connect_action('save_file', lambda: self.save_data())
 
     def load_data(self, path: Path = None):
         if path is None:
-            path = select_file(get_set_sequencer_path(),
+            path = select_file(self._current_path,
+                               filter='Sequence file (*.seq)',
                                save=False, ext='seq', force_save_extension=True)
         if path is not None and path != '':
+            self._current_path = path.parent
             self.model().load_elements(path)
 
     def save_data(self, path: Path = None):
         if path is None:
-            path = select_file(get_set_sequencer_path(),
+            path = select_file(self._current_path,
+                               filter='Sequence file (*.seq)',
                                save=True, ext='seq', force_save_extension=True)
         if path is not None and path != '':
+            self._current_path = path.parent
             self.model().save_elements(path)
 
     def add_element(self, name: str, path:tuple[str] = ()):
