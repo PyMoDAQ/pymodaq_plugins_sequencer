@@ -1,0 +1,89 @@
+from typing import TYPE_CHECKING
+import numpy as np
+
+from qtpy import QtWidgets, QtCore
+
+from serializall import SerializableFactory
+from pymodaq_data import DataToExport, DataWithAxes, DataRaw
+from pymodaq_gui.utils.widgets import SpinBox
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
+
+
+ser_factory = SerializableFactory()
+
+@SerializableFactory.register_decorator()
+@SeqEltFactory.register_elt()
+class WaitElt(SeqEltBase):
+
+    elt_name = 'wait'
+    children_allowed = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.timer = QtCore.QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.done)
+
+        self._wait_time_ms: int = 100
+
+    @property
+    def wait_time(self) -> int:
+        return self._wait_time_ms
+
+    @wait_time.setter
+    def wait_time(self, value: int):
+        self._wait_time_ms = value
+
+    def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
+        spin_box = SpinBox(parent=base_widget,
+                           value=self.wait_time,
+                           int=True, suffix='ms', siPrefix=False)
+        base_widget.add_widget_top(spin_box)
+        spin_box.sigValueChanged.connect(self.set_wait_time_from_spinbox)
+        return base_widget
+
+    def set_wait_time_from_spinbox(self, spinbox: SpinBox):
+        self.wait_time = spinbox.value()
+
+    def execute(self, dte: DataToExport = None):
+        self.timer.setInterval(int(self.wait_time))
+        self.timer.start()
+
+    def done(self):
+        self.done_signal.emit(
+            DataToExport(self.__class__.__name__,
+                         data=[DataRaw('wait_time',
+                                       data=[np.atleast_1d(self.wait_time)],
+                                       units='s')]))
+
+    def serialize_custom(self) -> bytes:
+        """Serialize the custom part of the element
+
+        to be reimplemented
+        """
+        return ser_factory.get_apply_serializer(self.wait_time)
+
+    def deserialize_custom(self, bytes_str: bytes) -> bytes:
+        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
+        or methods
+
+        to be reimplemented
+
+        Returns
+        -------
+        bytes: the remaining bytes string if any
+        """
+        wait_time, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        self.wait_time = wait_time
+        return remaining_bytes
+
+    def _eq(self, other: 'WaitElt'):
+        """ Custom method to reimplement to assert two elements are equals"""
+        if not hasattr(other, 'wait_time'):
+            return False
+        return self.wait_time == other.wait_time
+
+    def __repr__(self):
+        return f'{super().__repr__()} - {self.wait_time}ms'
