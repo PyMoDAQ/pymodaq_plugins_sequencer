@@ -4,6 +4,7 @@ from typing import Any, Iterable, TYPE_CHECKING
 
 from qtpy.QtWidgets import QStyle
 from qtpy import QtWidgets, QtCore
+from qtpy.QtGui import QKeySequence
 
 from qtpy.QtCore import QModelIndex, QMimeData, Qt
 from qt_themes import get_theme
@@ -14,7 +15,7 @@ from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
-from pymodaq_utils.array_manipulation import are_elements_contiguous
+
 
 from ..element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
 from ..styling import button_style, menu_style, color_from_depth
@@ -26,20 +27,6 @@ if TYPE_CHECKING:
 seq_factory = SeqEltFactory()
 ser_factory = SerializableFactory()
 
-
-def elements_from_path(fname: Path) -> list[SeqEltBase]:
-    if not fname.exists():
-        return []
-    with open(fname, 'rb') as file:
-        lines = file.readlines()
-    all_lines = b''
-    for line in lines:
-        all_lines += line
-    data = []
-    while len(all_lines) > 0:
-        entry, all_lines = SeqEltBase.deserialize(all_lines)
-        data.append(entry)
-    return data
 
 def elt_level(index: QModelIndex) -> int:
     """ Calculate nesting depth of the element with the specified index """
@@ -585,7 +572,9 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
                                               elt == RootElt.elt_name)],
                                        self.add_element))
         self.menu.addSeparator()
-        self.add_action('remove', 'Remove Element', menu=self.menu)
+        self.add_action('remove', 'Remove Element', menu=self.menu,
+                        shortcut=Qt.Key.Key_Delete)
+        self.addAction(self.get_action('remove'))
         self.connect_action('remove', self.remove)
 
         self.add_action('clear_children', 'Clear Children', menu=self.menu)
@@ -593,8 +582,12 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
 
         self.menu.addSeparator()
 
-        self.add_action('load_file', 'Load Sequence File', menu=self.menu)
-        self.add_action('save_file', 'Save Sequence File', menu=self.menu)
+        self.add_action('load_file', 'Load Sequence File', menu=self.menu,
+                        shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_O))
+        self.addAction(self.get_action('load_file'))
+        self.add_action('save_file', 'Save Sequence File', menu=self.menu,
+                        shortcut=QKeySequence(Qt.Modifier.CTRL | Qt.Key.Key_S))
+        self.addAction(self.get_action('save_file'))
 
         self.connect_action('load_file', lambda: self.load_data())
         self.connect_action('save_file', lambda: self.save_data())
