@@ -1,5 +1,5 @@
-from pymodaq_plugins_sequencer.utilities.element_factory import (
-    QStateMachine, QFinalState, QHistoryState, QState)
+from pymodaq_plugins_sequencer.utilities.states import (
+    QStateMachine, QFinalState, QHistoryState, QState, QAbstractTransition)
 
 from qtpy import QtWidgets, QtCore
 
@@ -122,6 +122,7 @@ class Sequencer(CustomExt):
 
         self.root_elt.mstate.addTransition(self.get_action('stop').triggered, self.done_state)
         self.root_elt.mstate.addTransition(self.get_action('pause').triggered, self.history_state)
+        self.done_state.exited.connect(self.stop_sequence)
 
     def value_changed(self, param):
         """ Actions to perform when one of the param's value in self.settings is changed from the
@@ -144,17 +145,17 @@ class Sequencer(CustomExt):
         return self._model.root_elt
 
     def setup_machine(self):
+        for child in self.machine.children():
+            if isinstance(child, QAbstractTransition):
+                self.machine.removeTransition(child)
+            elif isinstance(child, QState):
+                self.machine.removeState(child)
+
         self.machine.addState(self.root_elt.mstate)
         self.machine.addState(self.done_state)
         self.machine.addState(self.history_state)
         self.machine.setInitialState(self.root_elt.mstate)
         self.root_elt.mstate.addTransition(self.root_elt.mstate.finished, self.done_state)
-
-    @staticmethod
-    def clear_state_and_transitions(elt: SeqEltBase):
-        for trans in list(elt.external_transitions):
-            elt.mstate.removeTransition(trans)
-        elt.mstate.setParent(None)
 
     def recursive_connect_elts(self, elt: SeqEltBase = None):
         if elt is None:
@@ -162,15 +163,15 @@ class Sequencer(CustomExt):
             logger.debug(f'Transitions from {elt}: {elt.mstate.transitions()}')
 
         for ind_child, child in enumerate(elt.children_without_add):
-            self.clear_state_and_transitions(child)
-            if ind_child == len(elt.children_without_add) - 1:
-                child.add_external_transition(child.mstate.finished, elt.execute_state)
-            else:
-                child.add_external_transition(child.mstate.finished, elt.children[ind_child+1].mstate)
-            child.mstate.assignProperty(self.label, 'text', repr(child))
-            child.mstate.setParent(elt.children_state)
+            child.mstate.clear_state_and_transitions()
+            child.mstate.setParent(elt.mstate.children_state)
             if ind_child == 0:
-                elt.children_state.setInitialState(child.mstate)
+                elt.mstate.children_state.setInitialState(child.mstate)
+            if ind_child == len(elt.children_without_add) - 1:
+                child.mstate.add_external_transition(child.mstate.finished, elt.mstate.execute_state)
+            else:
+                child.mstate.add_external_transition(child.mstate.finished, elt.children[ind_child+1].mstate)
+            child.mstate.assignProperty(self.label, 'text', repr(child))
             logger.debug(f'Transitions from {child}: {child.mstate.transitions()}')
             if child.children_allowed:
                 self.recursive_connect_elts(child)
@@ -178,6 +179,7 @@ class Sequencer(CustomExt):
     def start_sequence(self):
         self.label.setText('Machine starting')
         self.recursive_connect_elts()
+        self.setup_machine()
 
         self.machine.finished.connect(self.stop_sequence)
         self.machine.start()

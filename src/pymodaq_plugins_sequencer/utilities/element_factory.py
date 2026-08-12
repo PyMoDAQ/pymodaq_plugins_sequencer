@@ -2,13 +2,10 @@ from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
 from typing import Tuple, Callable, TYPE_CHECKING, Any, Union
-import weakref
 
-from PySide6.QtStateMachine import QAbstractTransition
 from qtpy import QtCore, QtWidgets
 
-from qtpy.QtStateMachine import QState, QStateMachine, QFinalState, QHistoryState  # noqa
-
+from pymodaq_plugins_sequencer.utilities.states import CompositeState, QAbstractTransition, QState
 
 from qt_themes import get_theme
 
@@ -58,28 +55,6 @@ def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utili
 MIME_TYPE = 'pymodaq/sequence_element'
 
 
-class QState(QState):
-    def onEntry(self, event, /):
-        print(f'Entering {self.objectName()}')
-        logger.debug(f'Entering {self.objectName()}')
-        logger.debug(f'Registered children: {self.children()}')
-
-    def onExit(self, event, /):
-        print(f'Exiting {self.objectName()}')
-        logger.debug(f'Exiting {self.objectName()}')
-
-
-class QFinalState(QFinalState):
-    def onEntry(self, event, /):
-        print(f'Entering  {self.objectName()}')
-        logger.debug(f'Entering  {self.objectName()}')
-        logger.debug(f'Registered children: {self.children()}')
-
-    def onExit(self, event, /):
-        print(f'Exiting {self.objectName()}')
-        logger.debug(f'Exiting {self.objectName()}')
-
-
 class SeqEltBase(QtCore.QObject, ActionManager):
     """ Base class defining the interface of all elements handled by the Sequencer
 
@@ -101,12 +76,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
 
-        self._mstate: QState | QStateMachine | QFinalState | None = None
-        self._execute_state: QState | None = None
-        self._saving_state: QState | None = None
-        self._done_state: QFinalState | None = None
-        self._children_state: QState | None = None
-        self._external_transitions = []
+        self._mstate:  CompositeState = None
 
         self._id = id
         self._go_to = id + 1
@@ -121,53 +91,13 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         isitalic = label_kwargs.pop('isitalic', True)
 
         self.font = Font(font_name, font_size, isbold, isitalic)
+        self.save_signal.connect(self.save_data)
 
     @property
-    def mstate(self) -> QState | QStateMachine:
+    def mstate(self) -> CompositeState:
         if self._mstate is None:
-            self._mstate = QState()
-            self._mstate.setObjectName(f'State of the elt: {self}')
-
-            self._execute_state = QState(self._mstate)
-            self._execute_state.setObjectName(f'ExecuteState of the elt: {self}')
-            self._saving_state = QState(self._mstate)
-            self._saving_state.setObjectName(f'SavingState of the elt: {self}')
-            self._done_state = QFinalState(self._mstate)
-            self._done_state.setObjectName(f'FinalState of the elt: {self}')
-            self._children_state = QState(self._mstate)
-            self._children_state.setObjectName(f'ChildrenState of the elt: {self}')
-
-            self._mstate.setInitialState(self._execute_state)
-            self._execute_state.entered.connect(self.execute)
-            self._execute_state.addTransition(self.save_signal, self._saving_state,)
-            self._execute_state.addTransition(self.children_signal, self._children_state)
-
-            self._mstate.addTransition(self.done_signal, self._done_state)  # apply to all substates
-
-            self.save_signal.connect(self.save_data)
-
+            self._mstate = CompositeState(self)
         return self._mstate
-
-    def add_external_transition(self, signal: QtCore.Signal, target: QState):
-        self._external_transitions.append(self.mstate.addTransition(signal, target))
-
-    @property
-    def external_transitions(self) -> list[QAbstractTransition]:
-        return self._external_transitions
-
-    @property
-    def children_state(self):
-        return self._children_state
-
-    @property
-    def execute_state(self):
-        return self._execute_state
-
-    @property
-    def done_state(self) -> QFinalState:
-        if self._done_state is None:
-            self.mstate  # trigger states/transitions creation
-        return self._done_state
 
     def _save_data(self, dte: DataToExport):
         """ to be reimplemented in elements in order to save it's data (if Any)"""
