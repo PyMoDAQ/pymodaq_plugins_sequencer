@@ -63,6 +63,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     children_signal = QtCore.Signal()
     done_signal = QtCore.Signal()
     save_signal = QtCore.Signal(DataToExport)
+    go_to_signal = QtCore.Signal(int)
 
     children_allowed = False
     params = []
@@ -79,7 +80,6 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self._mstate:  CompositeState = None
 
         self._id = id
-        self._go_to = id + 1
         self._dashboard: 'DashBoard' = None
         self._parent: 'SeqEltBase' = parent
 
@@ -165,7 +165,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):
             return False
-        for attr in ('id', 'name', 'go_to'):
+        for attr in ('id', 'name',):
             if getattr(self, attr) != getattr(other, attr):
                 return False
         return self._eq(other)
@@ -185,15 +185,6 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     @name.setter
     def name(self, value: str):
         self.elt_name = value
-
-    @property
-    def go_to(self):
-        """ Get/Set the next ID the Sequencer should go to """
-        return self._go_to
-
-    @go_to.setter
-    def go_to(self, value: int):
-        self._go_to = value
 
     def _create_base_widget(self, parent: QtWidgets.QWidget) -> WidgetWithToolbar:
         """ Base Widget"""
@@ -230,7 +221,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     @classmethod
     def serialize(cls, obj: 'SeqEltBase') -> bytes:
         bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id, obj._go_to))
+        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id))
         bytes_string += obj.serialize_custom()
         if obj.children_allowed:
             bytes_string += ser_factory.get_apply_serializer(obj.children)
@@ -245,9 +236,9 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         SeqEltBase: the decoded object
         bytes: the remaining bytes string if any
         """
-        (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        (elt_name, id) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
         seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
-        seq_elt.go_to = go_to
+
         remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
         if seq_elt.children_allowed:
             children, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)

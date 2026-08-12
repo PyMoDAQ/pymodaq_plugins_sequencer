@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 import numpy as np
+import weakref
 from pyqtgraph import mkColor
 
 from qtpy import QtWidgets, QtCore
@@ -7,16 +8,21 @@ from serializall import SerializableFactory
 
 
 from pymodaq_data import DataToExport, DataWithAxes, DataRaw
+from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.utils.widgets import SpinBox
 
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
+from pymodaq_gui.utils.widgets.combo import ComboBox
+from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
+from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
 ser_factory = SerializableFactory()
+choice_factory = ChoiceModelFactory()
 
 
 @SerializableFactory.register_decorator()
@@ -28,8 +34,27 @@ class ChoiceElt(GrabElt):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self._choice_model: ChoiceModelBase = None
+        self.settings: weakref.ref = None
+
         self._go_to_true: int = 100
         self._go_to_false: int = 100
+
+    @property
+    def choice_model(self) -> ChoiceModelBase:
+        if self._choice_model is None:
+            self._choice_model = choice_factory.get_model(choice_factory.models[0])()
+        return self._choice_model
+
+    @choice_model.setter
+    def choice_model(self, value: str):
+        self._choice_model = choice_factory.get_model(value)()
+        if self.settings is not None and self.settings() is not None:
+            self.settings().settings = self._choice_model.settings
+            self.settings().tree.setMinimumHeight(len(self.settings().settings.children()) * 50)
+
+    def set_choice_model(self, value: str):
+        self.choice_model = value
 
     @property
     def go_to_true(self) -> int:
@@ -65,6 +90,18 @@ class ChoiceElt(GrabElt):
         base_widget.add_widget_top(spin_box_false)
         spin_box_false.sigValueChanged.connect(self.set_go_to_false_from_spinbox)
 
+        combo = ComboBox()
+        combo.addItems(choice_factory.models)
+        combo.setCurrentText(choice_factory.models[0])
+        base_widget.add_widget_top(combo)
+
+        parameter = ParameterManager()
+        self.settings = weakref.ref(parameter)
+        parameter.settings = self.choice_model.settings
+        parameter.tree.setMinimumHeight(len(parameter.settings.children()) * 50)
+        base_widget.insert_widget(parameter.settings_tree, 2)
+        combo.currentTextChanged.connect(self.set_choice_model)
+
         return base_widget
 
     def set_go_to_true_from_spinbox(self, spinbox: SpinBox):
@@ -74,7 +111,8 @@ class ChoiceElt(GrabElt):
         self.go_to_false = spinbox.value()
 
     def _save_data(self, dte: DataToExport = None):
-        pass
+        choice_bool = self.choice_model.process_dte(dte)
+        self.go_to_signal.emit(self.go_to_true if choice_bool else self.go_to_false)
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element
