@@ -85,16 +85,23 @@ class GrabElt(SeqEltBase):
         if self._items is not None and self._items() is not None:
             self.selected = self._items().get_value()['selected']
 
-    def execute(self, dte: DataToExport=None):
+    def _execute(self, dte: DataToExport=None):
         self.filter_selected_wrt_manager()
         if len(self.selected) > 0:
             self.modules_manager.selected_detectors_name = self.selected
             self.modules_manager.connect_detectors()
             dte = self.modules_manager.grab_data()
             self.modules_manager.connect_detectors(False)
-            self.done_signal.emit(dte)
+            self.save_signal.emit(dte)
         else:
-            self.done_signal.emit(DataToExport('GrabElt'))
+            self.done_signal.emit()
+
+    def _save_data(self, dte: DataToExport):
+        #todo: do whatever is needed with those data,
+        # probably add them in a Queue (like the ramping extension)
+        # could also be done into another state (saving_state for instance), to do the saving. However
+        # it is not necessary to hold the machine to save if using the Queue mechanism
+        pass
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element

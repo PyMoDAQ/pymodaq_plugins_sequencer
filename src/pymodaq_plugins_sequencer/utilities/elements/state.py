@@ -75,7 +75,7 @@ class StateElt(SeqEltBase):
     def do_things_with_dashboard(self):
         self.state_manager: 'StateManager' = self.dashboard.state_manager
         self.state_manager.applied_entry.connect(
-            lambda: self.done_signal.emit(DataToExport('StateElt')))
+            lambda: self.done_signal.emit())
         self.state_manager.new_entry.connect(self.set_states)
         self.update_states()
 
@@ -108,7 +108,7 @@ class StateElt(SeqEltBase):
 
         return base_widget
 
-    def execute(self, dte: DataToExport):
+    def _execute(self, dte: DataToExport):
         self.state_manager.entry = self.state
         self.state_manager.execute_entry()
 

@@ -2,10 +2,10 @@ from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
 from typing import Tuple, Callable, TYPE_CHECKING, Any, Union
-import weakref
 
 from qtpy import QtCore, QtWidgets
-from qtpy.QtWidgets import QWidget
+
+from pymodaq_plugins_sequencer.utilities.states import CompositeState, QAbstractTransition, QState
 
 from qt_themes import get_theme
 
@@ -60,7 +60,10 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     """
     elt_name = abstract_attribute()
-    done_signal = QtCore.Signal(DataToExport)
+    children_signal = QtCore.Signal()
+    done_signal = QtCore.Signal()
+    save_signal = QtCore.Signal(DataToExport)
+
     children_allowed = False
     params = []
 
@@ -72,6 +75,8 @@ class SeqEltBase(QtCore.QObject, ActionManager):
                  **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
+
+        self._mstate:  CompositeState = None
 
         self._id = id
         self._go_to = id + 1
@@ -86,15 +91,26 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         isitalic = label_kwargs.pop('isitalic', True)
 
         self.font = Font(font_name, font_size, isbold, isitalic)
+        self.save_signal.connect(self.save_data)
+
+    @property
+    def mstate(self) -> CompositeState:
+        if self._mstate is None:
+            self._mstate = CompositeState(self)
+        return self._mstate
+
+    def _save_data(self, dte: DataToExport):
+        """ to be reimplemented in elements in order to save it's data (if Any)"""
+        pass
+
+    def save_data(self, dte: DataToExport):
+        self._save_data(dte)
+        self.done_signal.emit()
 
     @property
     def parent(self) -> 'SeqEltBase':
         """ Get/Set this element parent"""
-        try:
-            return self._parent
-        except RuntimeError as e:
-            pass
-            raise RuntimeError(str(e))
+        return self._parent
 
     @parent.setter
     def parent(self, value: 'SeqEltBase'):
@@ -107,6 +123,10 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     @property
     def children(self) -> list['SeqEltBase']:
         return self._children
+
+    @property
+    def children_without_add(self) -> list['SeqEltBase']:
+        return self._children[:-1]
 
     def __iter__(self):
         for child in self.children:
@@ -257,8 +277,15 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         Should emit the done_signal when executed (could be with empty DataToExport)
         """
-        raise NotImplementedError
+        logger.debug(f'Elt {self} executed')
+        self._execute(dte)
 
+    def _execute(self, dte: DataToExport = None):
+        """ Execute the Element
+
+        Should emit the done_signal when executed (could be with empty DataToExport)
+        """
+        raise NotImplementedError
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element

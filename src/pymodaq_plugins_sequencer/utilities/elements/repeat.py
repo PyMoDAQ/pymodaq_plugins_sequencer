@@ -27,6 +27,7 @@ class RepeatElt(SeqEltBase):
         super().__init__(*args, **kwargs)
 
         self._n_repeat: int = 3
+        self._ind_execute = 0
 
     def do_things_with_dashboard(self):
         pass
@@ -48,8 +49,14 @@ class RepeatElt(SeqEltBase):
     def set_repeat_from_spinbox(self, spinbox: SpinBox):
         self.n_repeat = spinbox.value()
 
-    def execute(self, dte: DataToExport=None):
-        pass
+    def _execute(self, dte: DataToExport=None):
+        if self._ind_execute < self.n_repeat:
+            """ This will execute the children state and its bundled elements n_repeat times"""
+            self._ind_execute += 1
+            self.children_signal.emit()
+        else:
+            self._ind_execute = 0
+            self.done_signal.emit()
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element

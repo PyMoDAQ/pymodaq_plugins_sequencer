@@ -135,6 +135,7 @@ class RootElt(SeqEltBase):
     def __init__(self, id: int = -1, parent=None):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
         super().__init__(id=-1, parent=parent)
+        self._ind_execute: int = 0
 
     def serialize_custom(self) -> bytes:
         return b''
@@ -144,6 +145,14 @@ class RootElt(SeqEltBase):
 
     def _eq(self, other: 'SeqEltBase'):
         return True
+
+    def _execute(self, dte: DataToExport = None):
+        if self._ind_execute == 0:
+            self._ind_execute += 1
+            self.children_signal.emit()
+        else:
+            self._ind_execute = 0
+            self.done_signal.emit()
 
 
 @SerializableFactory.register_decorator()
@@ -167,8 +176,8 @@ class AddButtonPlaceholder(SeqEltBase):
     def _eq(self, other: 'SeqEltBase'):
         return True
 
-    def execute(self, dte: DataToExport = None):
-        self.done_signal.emit(DataToExport('button'))
+    def _execute(self, dte: DataToExport = None):
+        self.done_signal.emit()
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element

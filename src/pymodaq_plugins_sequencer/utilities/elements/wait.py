@@ -47,16 +47,13 @@ class WaitElt(SeqEltBase):
     def set_wait_time_from_spinbox(self, spinbox: SpinBox):
         self.wait_time = spinbox.value()
 
-    def execute(self, dte: DataToExport = None):
+    def _execute(self, dte: DataToExport = None):
+        print(f'Starting Wait Timer for {self.wait_time} ms')
         self.timer.setInterval(int(self.wait_time))
         self.timer.start()
 
     def done(self):
-        self.done_signal.emit(
-            DataToExport(self.__class__.__name__,
-                         data=[DataRaw('wait_time',
-                                       data=[np.atleast_1d(self.wait_time)],
-                                       units='s')]))
+        self.done_signal.emit()
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element
