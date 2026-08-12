@@ -40,6 +40,6 @@ class ChoiceElt(SeqEltBase):
                         toolbar=base_widget.toolbar)
         return base_widget
 
-    def execute(self, dte: DataToExport = None):
+    def _execute(self, dte: DataToExport = None):
         pass
 

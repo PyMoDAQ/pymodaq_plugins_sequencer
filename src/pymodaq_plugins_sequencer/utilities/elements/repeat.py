@@ -48,7 +48,7 @@ class RepeatElt(SeqEltBase):
     def set_repeat_from_spinbox(self, spinbox: SpinBox):
         self.n_repeat = spinbox.value()
 
-    def execute(self, dte: DataToExport=None):
+    def _execute(self, dte: DataToExport=None):
         pass
 
     def serialize_custom(self) -> bytes:
