@@ -25,7 +25,6 @@ class CompositeState(QState):
         super().__init__(*args, **kwargs)
 
         self.execute_state: QState | None = None
-        self.saving_state: QState | None = None
         self.done_state: MyQFinalState | None = None
         self.children_state: QState | None = None
         self._external_transitions = []
@@ -35,7 +34,6 @@ class CompositeState(QState):
         self.setup_states()
 
         self.execute_state.entered.connect(elt.execute)
-        self.execute_state.addTransition(elt.save_signal, self.saving_state, )
         self.execute_state.addTransition(elt.children_signal, self.children_state)
 
         self.addTransition(elt.done_signal, self.done_state)  # apply to all substates
@@ -51,8 +49,6 @@ class CompositeState(QState):
 
         self.execute_state = QState(self)
         self.execute_state.setObjectName(f'ExecuteState of the elt: {self._elt}')
-        self.saving_state = QState(self)
-        self.saving_state.setObjectName(f'SavingState of the elt: {self._elt}')
         self.done_state = MyQFinalState(self)
         self.done_state.setObjectName(f'FinalState of the elt: {self._elt}')
         self.children_state = QState(self)

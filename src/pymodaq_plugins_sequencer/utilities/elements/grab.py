@@ -97,7 +97,7 @@ class GrabElt(SeqEltBase):
             self.done_signal.emit()
 
     def _save_data(self, dte: DataToExport):
-        #todo: do whatever is needed with those data
+        #todo: do whatever is needed with those data, probably add them in a Queue (like the ramping extension)
         pass
 
     def serialize_custom(self) -> bytes:
