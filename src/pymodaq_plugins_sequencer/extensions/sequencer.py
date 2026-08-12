@@ -1,5 +1,5 @@
 from pymodaq_plugins_sequencer.utilities.states import (
-    QStateMachine, QFinalState, QHistoryState, QState, QAbstractTransition)
+    QStateMachine, MyQFinalState, QHistoryState, QState, QAbstractTransition)
 
 from qtpy import QtWidgets, QtCore
 
@@ -32,7 +32,7 @@ class Sequencer(CustomExt):
         self._model: SequenceTreeModel = None
 
         self.machine = QStateMachine()
-        self.done_state = QFinalState()
+        self.done_state = MyQFinalState()
         self.history_state = QHistoryState()
 
         self.setup_ui()
@@ -160,7 +160,6 @@ class Sequencer(CustomExt):
     def recursive_connect_elts(self, elt: SeqEltBase = None):
         if elt is None:
             elt = self.root_elt
-            logger.debug(f'Transitions from {elt}: {elt.mstate.transitions()}')
 
         for ind_child, child in enumerate(elt.children_without_add):
             child.mstate.clear_state_and_transitions()
@@ -172,7 +171,6 @@ class Sequencer(CustomExt):
             else:
                 child.mstate.add_external_transition(child.mstate.finished, elt.children[ind_child+1].mstate)
             child.mstate.assignProperty(self.label, 'text', repr(child))
-            logger.debug(f'Transitions from {child}: {child.mstate.transitions()}')
             if child.children_allowed:
                 self.recursive_connect_elts(child)
 

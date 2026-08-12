@@ -12,14 +12,11 @@ if TYPE_CHECKING:
 
 logger = set_logger(get_module_name(__file__))
 
-class QFinalState(QFinalState):
+class MyQFinalState(QFinalState):
     def onEntry(self, event, /):
-        print(f'Entering  {self.objectName()}')
         logger.debug(f'Entering  {self.objectName()}')
-        logger.debug(f'Registered children: {self.children()}')
 
     def onExit(self, event, /):
-        print(f'Exiting {self.objectName()}')
         logger.debug(f'Exiting {self.objectName()}')
 
 
@@ -29,7 +26,7 @@ class CompositeState(QState):
 
         self.execute_state: QState | None = None
         self.saving_state: QState | None = None
-        self.done_state: QFinalState | None = None
+        self.done_state: MyQFinalState | None = None
         self.children_state: QState | None = None
         self._external_transitions = []
 
@@ -44,12 +41,9 @@ class CompositeState(QState):
         self.addTransition(elt.done_signal, self.done_state)  # apply to all substates
 
     def onEntry(self, event, /):
-        print(f'Entering {self.objectName()}')
         logger.debug(f'Entering {self.objectName()}')
-        logger.debug(f'Registered children: {self.children()}')
 
     def onExit(self, event, /):
-        print(f'Exiting {self.objectName()}')
         logger.debug(f'Exiting {self.objectName()}')
 
     def setup_states(self):
@@ -59,7 +53,7 @@ class CompositeState(QState):
         self.execute_state.setObjectName(f'ExecuteState of the elt: {self._elt}')
         self.saving_state = QState(self)
         self.saving_state.setObjectName(f'SavingState of the elt: {self._elt}')
-        self.done_state = QFinalState(self)
+        self.done_state = MyQFinalState(self)
         self.done_state.setObjectName(f'FinalState of the elt: {self._elt}')
         self.children_state = QState(self)
         self.children_state.setObjectName(f'ChildrenState of the elt: {self._elt}')

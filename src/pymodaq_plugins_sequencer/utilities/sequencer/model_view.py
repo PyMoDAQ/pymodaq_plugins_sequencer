@@ -137,9 +137,6 @@ class RootElt(SeqEltBase):
         super().__init__(id=-1, parent=parent)
         self._ind_execute: int = 0
 
-    def init_elt(self):
-        self._ind_execute = 0
-
     def serialize_custom(self) -> bytes:
         return b''
 

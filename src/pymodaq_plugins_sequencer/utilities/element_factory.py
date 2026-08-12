@@ -277,7 +277,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         Should emit the done_signal when executed (could be with empty DataToExport)
         """
-        print(f'Elt {self} executed')
+        logger.debug(f'Elt {self} executed')
         self._execute(dte)
 
     def _execute(self, dte: DataToExport = None):
