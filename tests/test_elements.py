@@ -5,18 +5,44 @@ from qt_themes import set_theme
 
 from serializall import SerializableFactory
 
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory, SeqEltBase
 from pymodaq_plugins_sequencer.utilities.mocks import DAQ_Move, DAQ_Viewer, DashBoard
 
 
 seq_factory = SeqEltFactory()
 ser_factory = SerializableFactory()
 
+ROOT_INDEX = -1
+
 
 @pytest.fixture
 def qtbot(qtbot):
     set_theme("monokai")
     return qtbot
+
+
+def create_tree() -> SeqEltBase:
+    """create a tree of SeqEltBase with two levels depth
+
+    First layer has 5 children with index from 0 to 5
+    Each child as one child
+    """
+    elt = SeqEltFactory.get_seq_elt('wait')(ROOT_INDEX)
+    elt.children_allowed = True
+    ind = 0
+    for _ in range(0, 5):
+        ind += 1
+        child = SeqEltFactory.get_seq_elt('wait')(ind)
+        child.children_allowed = True
+        elt.append_child(child)
+
+        for _ in range(0, 5):
+            ind += 1
+            grandchild = SeqEltFactory.get_seq_elt('wait')(ind)
+            grandchild.children_allowed = True
+            child.append_child(grandchild)
+
+    return elt
 
 
 @pytest.fixture
@@ -65,3 +91,19 @@ class TestElements:
         assert remaining_bytes == b''
 
 
+def test_get_elt_by_id_and_get_root():
+
+    root = create_tree()
+
+    elt_7_id = 7
+    elt_7 = root.get_elt_from_id(elt_7_id)
+
+    elt_4_id = 4
+    assert elt_7.id == elt_7_id
+    assert elt_7.get_root_elt() == root
+
+    elt_4 = elt_7.get_elt_from_id(elt_4_id)
+    assert elt_4.id == elt_4_id
+    assert elt_4.get_root_elt() == root
+
+    assert elt_4.get_elt_from_id(-2) is None

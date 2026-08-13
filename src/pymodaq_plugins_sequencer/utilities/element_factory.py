@@ -120,6 +120,38 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         """ to be used as a slot or ..."""
         self.parent = value
 
+    def get_root_elt(self) -> 'SeqEltBase':
+        root = self
+        while root.parent is not None:
+            root = root.parent
+        return root
+
+    def get_elt_from_id(self, elt_id: int,
+                        start_parent: 'SeqEltBase' = None,
+                        ) -> Union['SeqEltBase', None]:
+        """ Get the Element having the specified id  starting from start_parent in the tree
+
+        Parameters
+        ----------
+        elt_id : int
+        start_parent : SeqEltBase
+            Optional, if not specified or None, start from the Root of this element hierarchy
+
+        Returns
+        -------
+        SeqEltBase or None
+        """
+        if start_parent is None:
+            start_parent = self.get_root_elt()
+        if start_parent.id == elt_id:
+            return start_parent
+        elif start_parent.children_allowed:
+            for child in start_parent.children:
+                target_elt = self.get_elt_from_id(elt_id, child)
+                if target_elt is not None:
+                    return target_elt
+        return None
+
     @property
     def children(self) -> list['SeqEltBase']:
         return self._children
