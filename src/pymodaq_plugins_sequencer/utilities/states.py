@@ -1,7 +1,8 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from qtpy import QtCore
 
-from qtpy.QtStateMachine import QState, QStateMachine, QFinalState, QHistoryState, QAbstractTransition  # noqa
+from qtpy.QtStateMachine import (QState, QStateMachine, QFinalState, QHistoryState,
+                                 QAbstractTransition, QSignalTransition)  # noqa
 
 
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -11,6 +12,8 @@ if TYPE_CHECKING:
 
 
 logger = set_logger(get_module_name(__file__))
+
+
 
 class MyQFinalState(QFinalState):
     def onEntry(self, event, /):
@@ -67,3 +70,20 @@ class CompositeState(QState):
         for trans in list(self.external_transitions):
             self.removeTransition(trans)
         self.setParent(None)
+
+
+class ValueTransition(QSignalTransition):
+    def __init__(self, signal: QtCore.Signal, value: Any, target_state: QState):
+        super().__init__(signal)
+        self.value = value
+        self.setTargetState(target_state)
+
+    def eventTest(self, event: QStateMachine.SignalEvent) -> bool:
+        if not super().eventTest(event):
+            return False
+
+        arguments = event.arguments()
+        if arguments:
+            value = arguments[0]
+            return value == self.value
+        return False

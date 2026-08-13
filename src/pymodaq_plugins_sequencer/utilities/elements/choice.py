@@ -18,6 +18,7 @@ from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelB
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
+from pymodaq_plugins_sequencer.utilities.states import ValueTransition
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
@@ -37,8 +38,21 @@ class ChoiceElt(GrabElt):
         self._choice_model: ChoiceModelBase = None
         self.settings: weakref.ref = None
 
-        self._go_to_true: int = 100
-        self._go_to_false: int = 100
+        self._go_to_true: int = 1
+        self._go_to_false: int = 2
+
+        self.value_true_transition = ValueTransition(
+            self.go_to_signal, True,
+            self.get_elt_from_id(self.go_to_true).mstate)
+
+        self.value_false_transition = ValueTransition(
+            self.go_to_signal, False,
+            self.get_elt_from_id(self.go_to_false).mstate)
+
+
+
+        self.mstate.addTransition(self.value_true_transition)
+        self.mstate.addTransition(self.value_false_transition)
 
     @property
     def choice_model(self) -> ChoiceModelBase:
@@ -151,5 +165,25 @@ class ChoiceElt(GrabElt):
 
     def __repr__(self):
         return f'{super().__repr__()} - True: {self.go_to_true} - False: {self.go_to_false}'
+
+    def set_value_transition(self):
+        self.value_false_transition.value = self.go_to_false
+        self.value_true_transition.value = self.go_to_true
+
+    def _execute(self, dte: DataToExport=None):
+        self.set_value_transition()
+
+        # get data from detectors if needed by the model
+        self.filter_selected_wrt_manager()
+        if len(self.selected) > 0:
+            self.modules_manager.selected_detectors_name = self.selected
+            self.modules_manager.connect_detectors()
+            dte = self.modules_manager.grab_data()
+            self.modules_manager.connect_detectors(False)
+        else:
+            dte = DataToExport('Grab')
+
+        boolean_result = self.choice_model.process_dte(dte)
+        self.go_to_signal.emit(self.go_to_true if boolean_result else self.go_to_false)
 
 
