@@ -126,6 +126,26 @@ class SeqEltBase(QtCore.QObject, ActionManager):
             root = root.parent
         return root
 
+    def get_ids(self, parent_elt: 'SeqEltBase' = None) -> list[int]:
+        """ Get the ids of the existing elements"""
+        ids = []
+        if parent_elt is None:
+            parent_elt = self.get_root_elt()
+        for child in parent_elt.children:
+            ids.append(child.id)
+            ids.extend(self.get_ids(child))
+        return ids
+
+    def get_elts_as_str(self, parent_elt: 'SeqEltBase' = None) -> list[str]:
+        """ Get the elements name of all existing elements"""
+        elts = []
+        if parent_elt is None:
+            parent_elt = self.get_root_elt()
+        for child in parent_elt.children:
+            elts.append(str(child))
+            elts.extend(self.get_elts_as_str(child))
+        return elts
+
     def get_elt_from_id(self, elt_id: int,
                         start_parent: 'SeqEltBase' = None,
                         ) -> Union['SeqEltBase', None]:

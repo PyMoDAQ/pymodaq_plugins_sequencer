@@ -21,7 +21,7 @@ def qtbot(qtbot):
     return qtbot
 
 
-def create_tree() -> SeqEltBase:
+def create_tree() -> tuple[SeqEltBase, list[int], list[str]]:
     """create a tree of SeqEltBase with two levels depth
 
     First layer has 5 children with index from 0 to 5
@@ -30,19 +30,25 @@ def create_tree() -> SeqEltBase:
     elt = SeqEltFactory.get_seq_elt('wait')(ROOT_INDEX)
     elt.children_allowed = True
     ind = 0
+    ids = []
+    elts_repr = []
     for _ in range(0, 5):
         ind += 1
         child = SeqEltFactory.get_seq_elt('wait')(ind)
+        ids.append(child.id)
+        elts_repr.append(str(child))
         child.children_allowed = True
         elt.append_child(child)
 
         for _ in range(0, 5):
             ind += 1
             grandchild = SeqEltFactory.get_seq_elt('wait')(ind)
+            ids.append(grandchild.id)
+            elts_repr.append(str(grandchild))
             grandchild.children_allowed = True
             child.append_child(grandchild)
 
-    return elt
+    return elt, ids, elts_repr
 
 
 @pytest.fixture
@@ -93,7 +99,7 @@ class TestElements:
 
 def test_get_elt_by_id_and_get_root():
 
-    root = create_tree()
+    root, _, _ = create_tree()
 
     elt_7_id = 7
     elt_7 = root.get_elt_from_id(elt_7_id)
@@ -107,3 +113,21 @@ def test_get_elt_by_id_and_get_root():
     assert elt_4.get_root_elt() == root
 
     assert elt_4.get_elt_from_id(-2) is None
+
+
+def test_get_ids():
+
+    root, all_ids, all_reprs = create_tree()
+    ids = root.get_ids()
+
+    for id in ids:
+        assert id in all_ids
+    for id in all_ids:
+        assert id in ids
+
+    elts_repr = root.get_elts_as_str()
+
+    for _repr in elts_repr:
+        assert _repr in all_reprs
+    for _repr in all_reprs:
+        assert _repr in elts_repr
