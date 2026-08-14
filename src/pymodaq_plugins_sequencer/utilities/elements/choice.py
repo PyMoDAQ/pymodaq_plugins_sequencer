@@ -71,33 +71,46 @@ class ChoiceElt(GrabElt):
     def go_to_true(self) -> int:
         return self._go_to_true
 
+    @go_to_true.setter
+    def go_to_true(self, value: int):
+        self._go_to_true = value
+        target_elt = self.get_elt_from_id(value)
+        if target_elt is not None:
+            self.value_true_transition.update_target(target_elt.mstate)
+
+    @QtCore.Slot(int)
     def set_go_to_true(self, value: int):
         """ set go_true given the value which is the index of the get_ids or self.get_elts_as_str
         return lists
         """
-        id = self.get_ids(without=(-2,))[value]
-        self._go_to_true = id
-        target_elt = self.get_elt_from_id(id)
-        if target_elt is not None:
-            self.value_true_transition.update_target(target_elt.mstate)
+        id = self.get_ids(without=self.without)[value]
+        self.go_to_true = id
+
+    @property
+    def without(self):
+        return -2, self.id
 
     @property
     def go_to_false(self) -> int:
         return self._go_to_false
 
-    def set_go_to_false(self, value: int):
-        id = self.get_ids(without=(-2,))[value]
-        self._go_to_false = id
-        target_elt = self.get_elt_from_id(id)
+    @go_to_false.setter
+    def go_to_false(self, value: int):
+        self._go_to_false = value
+        target_elt = self.get_elt_from_id(value)
         if target_elt is not None:
             self.value_false_transition.update_target(target_elt.mstate)
+
+    def set_go_to_false(self, value: int):
+        id = self.get_ids(without=(-2,))[value]
+        self.go_to_false = id
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         base_widget = super()._create_widget(base_widget)
 
         combo_true = ComboBox()
         with QtCore.QSignalBlocker(combo_true):
-            combo_true.addItems(self.get_elts_as_str(without=(-2,)))
+            combo_true.addItems(self.get_elts_as_str(without=self.without))
             combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_true)))
             combo_true.setStyleSheet(
                 f"""background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};
@@ -109,7 +122,7 @@ class ChoiceElt(GrabElt):
 
         combo_false = ComboBox()
         with QtCore.QSignalBlocker(combo_false):
-            combo_false.addItems(self.get_elts_as_str(without=(-2,)))
+            combo_false.addItems(self.get_elts_as_str(without=self.without))
             combo_false.setCurrentText(str(self.get_elt_from_id(self.go_to_false)))
             combo_false.setStyleSheet(
                 f"""background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};
@@ -142,6 +155,7 @@ class ChoiceElt(GrabElt):
         bytes_to_ser = super().serialize_custom()
         bytes_to_ser += ser_factory.get_apply_serializer(self.go_to_true)
         bytes_to_ser += ser_factory.get_apply_serializer(self.go_to_false)
+        bytes_to_ser += ser_factory.get_apply_serializer(self.choice_model.model_name)
         return bytes_to_ser
 
     def deserialize_custom(self, bytes_str: bytes) -> bytes:
@@ -158,8 +172,11 @@ class ChoiceElt(GrabElt):
 
         go_true, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         go_false, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.set_go_to_false(go_false)
-        self.set_go_to_true(go_true)
+        model_name, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
+
+        self.go_to_false = go_false
+        self.go_to_true = go_true
+        self.choice_model = model_name
         return remaining_bytes
 
     def _eq(self, other: 'ChoiceElt') -> bool:
@@ -167,10 +184,12 @@ class ChoiceElt(GrabElt):
         status =  super()._eq(other)
         if not (hasattr(other, 'go_to_true') or hasattr(other, 'go_to_false')):
             return False
-        return self.go_to_false == other.go_to_false and self.go_to_true == other.go_to_true
+        return (self.go_to_false == other.go_to_false and
+                self.go_to_true == other.go_to_true and
+                self.choice_model.model_name == other.choice_model.model_name)
 
     def __repr__(self):
-        return f'{super().__repr__()} - True: {self.go_to_true} - False: {self.go_to_false}'
+        return f'{super().__repr__()} - Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'
 
     def _execute(self, dte: DataToExport=None):
         # get data from detectors if needed by the model
