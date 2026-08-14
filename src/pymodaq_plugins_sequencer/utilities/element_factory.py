@@ -125,19 +125,24 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         return root
 
     def get_ids(self, parent_elt: 'SeqEltBase' = None,
-                 without: Iterable[int]=()) -> list[int]:
+                without_ids: Iterable[int] = (),
+                without_types: Iterable[type['SeqEltBase']] = ()) -> list[int]:
         """ Get the ids of the existing elements"""
-        return [elt.id for elt in self.get_elts(parent_elt, without)]
+        return [elt.id for elt in self.get_elts(parent_elt, without_ids, without_types)]
 
     def get_elts(self, parent_elt: 'SeqEltBase' = None,
-                 without: Iterable[int]=()) -> list['SeqEltBase']:
+                 without_ids: Iterable[int] = (),
+                 without_types: Iterable[type['SeqEltBase']] = ()) -> list['SeqEltBase']:
         """ Get as a list all element in the tree starting from parent_elt
 
         Parameters
         ----------
+        without_types
         parent_elt: SeqEltBase, Optional (the root element is taken in this case)
-        without: tuple[int], optional (default: ())
+        without_ids: tuple[int], optional (default: ())
             tuple of ids to remove from the result
+        without_types: tuple[SeqEltBase], optional (default: ())
+            tuple of elements type to remove from the result
 
         Returns
         -------
@@ -147,15 +152,17 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         if parent_elt is None:
             parent_elt = self.get_root_elt()
         for child in parent_elt.children:
-            if child.id not in without:
+            if child.id not in without_ids and type(child) not in without_types:
                 elts.append(child)
-            elts.extend(self.get_elts(child))
+            elts.extend(self.get_elts(child, without_ids=without_ids,
+                                      without_types=without_types))
         return elts
 
     def get_elts_as_str(self, parent_elt: 'SeqEltBase' = None,
-                 without: Iterable[int]=()) -> list[str]:
+                        without_ids: Iterable[int] = (),
+                        without_types: Iterable[type['SeqEltBase']] = ()) -> list[str]:
         """ Get the elements name of all existing elements"""
-        return [str(elt) for elt in self.get_elts(parent_elt, without)]
+        return [str(elt) for elt in self.get_elts(parent_elt, without_ids, without_types)]
 
     def get_elt_from_id(self, elt_id: int,
                         start_parent: 'SeqEltBase' = None,
