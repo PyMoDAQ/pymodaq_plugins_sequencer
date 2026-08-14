@@ -133,9 +133,10 @@ class ChoiceElt(GrabElt):
         base_widget.add_widget_top(combo_false)
 
         combo = ComboBox()
-        combo.addItems(choice_factory.models)
-        combo.setCurrentText(choice_factory.models[0])
-        combo.setToolTip('Choice Model')
+        with QtCore.QSignalBlocker(combo_false):
+            combo.addItems(choice_factory.models)
+            combo.setCurrentText(self.choice_model.model_name)
+            combo.setToolTip('Choice Model')
         base_widget.insert_widget(combo, 1)
 
         parameter = ParameterManager()
