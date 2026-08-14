@@ -1,4 +1,4 @@
-from pymodaq_data import DataToExport
+from pymodaq_data import DataToExport, DataDim
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
 
@@ -7,13 +7,49 @@ from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelB
 class ThresholdChoiceModel(ChoiceModelBase):
     model_name = 'threshold'
 
-    params = [{'title': 'Threshold', 'name': 'threshold', 'type': 'float', 'value': 0},
-              {'title': 'Direction', 'name': 'direction', 'type': 'list', 'value': 'Above',
-               'limits': ['Above', 'Below']},
-              {'title': 'DataName', 'name': 'data_name', 'type': 'itemselect',},]
+    params = [
+        {'title': 'Detectors', 'name': 'detectors', 'type': 'itemselect'},
+        {'title': 'Probe Data', 'name': 'probe_data', 'type': 'action'},
+        {'title': 'Threshold', 'name': 'threshold', 'type': 'float', 'value': 0},
+        {'title': 'Direction', 'name': 'direction', 'type': 'list', 'value': 'Above',
+         'limits': ['Above', 'Below']},
+        {'title': 'Data0D', 'name': 'data_name', 'type': 'list',},]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.settings.child('probe_data').sigActivated.connect(self.probe_data)
+        self.settings['detectors'] = dict(all_items=self.modules_manager.detectors_name,
+                                          selected=self.modules_manager.detectors_name)
+
+    def updated_module_manager(self):
+        """ called whenever the parent modules manager is updated
+        """
+        self.settings['detectors'] = dict(all_items=self.modules_manager.detectors_name,
+                                          selected=self.modules_manager.detectors_name)
+
+    def probe_data(self):
+        self.modules_manager.selected_detectors_name = self.settings['detectors']['selected']
+        dte = self.modules_manager.get_det_data_list()
+        data0D_names = dte.get_full_names(DataDim.Data0D)
+        self.settings.child('data_name').setLimits(data0D_names)
+        if len(data0D_names) > 0:
+            self.settings['data_name'] = data0D_names[0]
+
+    def execute(self, dte: DataToExport):
+        if len(self.selected) > 0:
+            self.modules_manager.selected_detectors_name = self.settings['detectors']['selected']
+            self.modules_manager.connect_detectors()
+            dte = self.modules_manager.grab_data()
+            self.modules_manager.connect_detectors(False)
+        else:
+            dte = DataToExport('Grab')
+
+        boolean_result = self.process_dte(dte)
+        self.parent_elt.go_to_signal.emit(boolean_result)
+        pass
 
     def process_dte(self, dte: DataToExport) -> bool:
-        dwa = dte.get_data_from_name(self.settings['data_name'])
+        dwa = dte.get_data_from_full_name(self.settings['data_name'])
         if self.settings['direction'] == 'Above':
             return dwa.value() > self.settings['threshold']
         else:

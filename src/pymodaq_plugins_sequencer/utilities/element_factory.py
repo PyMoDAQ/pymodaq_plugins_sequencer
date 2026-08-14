@@ -11,7 +11,6 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory, SerializableBase
 
-from packages.pymodaq.tests.extensions.extension_loading_test import dashboard
 from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.parameter_manager import ParameterManager
@@ -27,7 +26,6 @@ logger = set_logger(get_module_name(__file__))
 
 if TYPE_CHECKING:
     from pymodaq.dashboard import Dashboard
-
 
 ser_factory = SerializableFactory()
 

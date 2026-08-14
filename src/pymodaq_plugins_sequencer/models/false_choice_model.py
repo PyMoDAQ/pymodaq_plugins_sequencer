@@ -9,5 +9,5 @@ class FalseChoiceModel(ChoiceModelBase):
 
     params = []
 
-    def process_dte(self, dte: DataToExport) -> bool:
-        return False
+    def execute(self, dte: DataToExport):
+        self.parent_elt.go_to_signal.emit(False)
