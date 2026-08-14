@@ -71,53 +71,52 @@ class ChoiceElt(GrabElt):
     def go_to_true(self) -> int:
         return self._go_to_true
 
-    @go_to_true.setter
-    def go_to_true(self, value: str):
-        self._go_to_true = self.get_ids()[self.get_elts_as_str().index(value)]
-        target_elt = self.get_elt_from_id(self._go_to_true)
+    def set_go_to_true(self, value: int):
+        """ set go_true given the value which is the index of the get_ids or self.get_elts_as_str
+        return lists
+        """
+        id = self.get_ids(without=(-2,))[value]
+        self._go_to_true = id
+        target_elt = self.get_elt_from_id(id)
         if target_elt is not None:
             self.value_true_transition.update_target(target_elt.mstate)
-
-    def set_go_to_true(self, value: str):
-        self.go_to_true = value
 
     @property
     def go_to_false(self) -> int:
         return self._go_to_false
 
-    @go_to_false.setter
-    def go_to_false(self, value: str):
-        self._go_to_false = self.get_ids()[self.get_elts_as_str().index(value)]
-        target_elt = self.get_elt_from_id(self._go_to_false)
+    def set_go_to_false(self, value: int):
+        id = self.get_ids(without=(-2,))[value]
+        self._go_to_false = id
+        target_elt = self.get_elt_from_id(id)
         if target_elt is not None:
             self.value_false_transition.update_target(target_elt.mstate)
 
-    def set_go_to_false(self, value: str):
-        self.go_to_false = value
-
-    def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
+    def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         base_widget = super()._create_widget(base_widget)
 
         combo_true = ComboBox()
-        combo_true.addItems(self.get_elts_as_str())
-        combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_true)))
-        combo_true.setStyleSheet(
-            f"""background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};
-                color: #{hex(mkColor(get_theme().base).rgb())[2:]};
-            """)
-        combo_true.currentTextChanged.connect(self.set_go_to_true)
-        combo_true.setToolTip('Go to this elt if True')
+        with QtCore.QSignalBlocker(combo_true):
+            combo_true.addItems(self.get_elts_as_str(without=(-2,)))
+            combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_true)))
+            combo_true.setStyleSheet(
+                f"""background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};
+                    color: #{hex(mkColor(get_theme().base).rgb())[2:]};
+                """)
+            combo_true.currentIndexChanged.connect(self.set_go_to_true)
+            combo_true.setToolTip('Go to this elt if True')
         base_widget.add_widget_top(combo_true)
 
         combo_false = ComboBox()
-        combo_false.addItems(self.get_elts_as_str())
-        combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_false)))
-        combo_false.setStyleSheet(
-            f"""background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};
-                color: #{hex(mkColor(get_theme().base).rgb())[2:]};
-            """)
-        combo_false.currentTextChanged.connect(self.set_go_to_false)
-        combo_false.setToolTip('Go to this elt if False')
+        with QtCore.QSignalBlocker(combo_false):
+            combo_false.addItems(self.get_elts_as_str(without=(-2,)))
+            combo_false.setCurrentText(str(self.get_elt_from_id(self.go_to_false)))
+            combo_false.setStyleSheet(
+                f"""background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};
+                    color: #{hex(mkColor(get_theme().base).rgb())[2:]};
+                """)
+            combo_false.currentIndexChanged.connect(self.set_go_to_false)
+            combo_false.setToolTip('Go to this elt if False')
         base_widget.add_widget_top(combo_false)
 
         combo = ComboBox()
@@ -134,12 +133,6 @@ class ChoiceElt(GrabElt):
         combo.currentTextChanged.connect(self.set_choice_model)
 
         return base_widget
-
-
-
-    def _save_data(self, dte: DataToExport = None):
-        choice_bool = self.choice_model.process_dte(dte)
-        self.go_to_signal.emit(self.go_to_true if choice_bool else self.go_to_false)
 
     def serialize_custom(self) -> bytes:
         """Serialize the custom part of the element
@@ -165,8 +158,8 @@ class ChoiceElt(GrabElt):
 
         go_true, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         go_false, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.go_to_false = go_false
-        self.go_to_true = go_true
+        self.set_go_to_false(go_false)
+        self.set_go_to_true(go_true)
         return remaining_bytes
 
     def _eq(self, other: 'ChoiceElt') -> bool:
@@ -179,13 +172,7 @@ class ChoiceElt(GrabElt):
     def __repr__(self):
         return f'{super().__repr__()} - True: {self.go_to_true} - False: {self.go_to_false}'
 
-    def set_value_transition(self):
-        self.value_false_transition.value = self.go_to_false
-        self.value_true_transition.value = self.go_to_true
-
     def _execute(self, dte: DataToExport=None):
-        self.set_value_transition()
-
         # get data from detectors if needed by the model
         self.filter_selected_wrt_manager()
         if len(self.selected) > 0:
