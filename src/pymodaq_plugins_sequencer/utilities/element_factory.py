@@ -333,8 +333,16 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         Should emit the done_signal when executed (could be with empty DataToExport)
         """
-        logger.debug(f'Elt {self} executed')
+        logger.debug(f'Elt {self} executing')
         self._execute(dte)
+
+    def is_valid(self) -> bool:
+        """ Check the validity of the element
+
+        Will be called before executing the element
+
+        To be reimplemented"""
+        raise NotImplementedError
 
     def _execute(self, dte: DataToExport = None):
         """ Execute the Element

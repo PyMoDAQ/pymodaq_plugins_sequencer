@@ -174,10 +174,19 @@ class Sequencer(CustomExt):
             if child.children_allowed:
                 self.recursive_connect_elts(child)
 
+    def is_valid(self):
+        for elt in self.root_elt.get_elts():
+            if not elt.is_valid():
+                return False
+        return True
+
     def start_sequence(self):
         self.label.setText('Machine starting')
         self.recursive_connect_elts()
         self.setup_machine()
+        if not self.is_valid():
+            self.label.setText('Some elements are not valid, check the log')
+            return
 
         self.machine.finished.connect(self.stop_sequence)
         self.machine.start()
