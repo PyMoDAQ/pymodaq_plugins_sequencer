@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import weakref
 
-from pymodaq_gui.parameter.utils import ParameterWithPath
+from pymodaq_gui.parameter.utils import ParameterWithPath, Parameter
 from pymodaq_gui.utils.widget_sync import WidgetSync
 from pyqtgraph import mkColor
 
@@ -21,6 +21,7 @@ from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelB
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
+from pymodaq_plugins_sequencer.utilities.sequencer.model_view import AddButtonPlaceholder
 from pymodaq_plugins_sequencer.utilities.states import ValueTransition
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
@@ -96,12 +97,17 @@ class ChoiceElt(SeqEltBase):
         """ set go_true given the value which is the index of the get_ids or self.get_elts_as_str
         return lists
         """
-        id = self.get_ids(without=self.without)[value]
+        id = self.get_ids(without_ids=self.without_ids,
+                          without_types=self.without_types)[value]
         self.go_to_true = id
 
     @property
-    def without(self):
-        return -2, self.id
+    def without_ids(self):
+        return (self.id, )
+
+    @property
+    def without_types(self):
+        return (AddButtonPlaceholder, )
 
     @property
     def go_to_false(self) -> int:
@@ -115,13 +121,15 @@ class ChoiceElt(SeqEltBase):
             self.value_false_transition.update_target(target_elt.mstate)
 
     def set_go_to_false(self, value: int):
-        id = self.get_ids(without=self.without)[value]
+        id = self.get_ids(without_ids=self.without_ids,
+                          without_types=self.without_types)[value]
         self.go_to_false = id
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         combo_true = ComboBox()
         with QtCore.QSignalBlocker(combo_true):
-            combo_true.addItems(self.get_elts_as_str(without=self.without))
+            combo_true.addItems(self.get_elts_as_str(without_ids=self.without_ids,
+                                                     without_types=self.without_types))
             combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_true)))
             combo_true.setStyleSheet(
                 f"""background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};
@@ -133,7 +141,8 @@ class ChoiceElt(SeqEltBase):
 
         combo_false = ComboBox()
         with QtCore.QSignalBlocker(combo_false):
-            combo_false.addItems(self.get_elts_as_str(without=self.without))
+            combo_false.addItems(self.get_elts_as_str(without_ids=self.without_ids,
+                                                      without_types=self.without_types))
             combo_false.setCurrentText(str(self.get_elt_from_id(self.go_to_false)))
             combo_false.setStyleSheet(
                 f"""background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};
@@ -196,8 +205,16 @@ class ChoiceElt(SeqEltBase):
         self.go_to_false = go_false
         self.go_to_true = go_true
         self.choice_model = model_name
-        self.choice_model.settings = pwp.parameter
+        self.recursive_apply_value(self.choice_model.settings,
+                                   pwp.parameter)
         return remaining_bytes
+
+    def recursive_apply_value(self, param1: Parameter, param2: Parameter):
+        if param1.value() is not None and param2.value() is not None:
+            param1.setValue(param2.value())
+        for ind_child in range(len(param1.children())):
+            self.recursive_apply_value(param1.children()[ind_child],
+                                       param2.children()[ind_child],)
 
     def _eq(self, other: 'ChoiceElt') -> bool:
         """ Custom method to reimplement to assert two elements are equals"""
@@ -208,7 +225,7 @@ class ChoiceElt(SeqEltBase):
                 self.choice_model.model_name == other.choice_model.model_name)
 
     def __repr__(self):
-        return f'Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'
+        return f'{super().__repr__()} - Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'
 
     def update_target_states(self):
         if self.value_false_transition.targetState() is None:
