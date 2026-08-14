@@ -1,6 +1,5 @@
 import weakref
 
-from numba.np.arrayobj import np_repeat
 from serializall import SerializableFactory
 
 from qtpy import QtCore
