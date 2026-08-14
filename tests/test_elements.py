@@ -21,7 +21,7 @@ def qtbot(qtbot):
     return qtbot
 
 
-def create_tree() -> tuple[SeqEltBase, list[int], list[str]]:
+def create_tree() -> tuple[SeqEltBase, list[int], list[SeqEltBase]]:
     """create a tree of SeqEltBase with two levels depth
 
     First layer has 5 children with index from 0 to 5
@@ -31,12 +31,12 @@ def create_tree() -> tuple[SeqEltBase, list[int], list[str]]:
     elt.children_allowed = True
     ind = 0
     ids = []
-    elts_repr = []
+    elts = []
     for _ in range(0, 5):
         ind += 1
         child = SeqEltFactory.get_seq_elt('wait')(ind)
         ids.append(child.id)
-        elts_repr.append(str(child))
+        elts.append(child)
         child.children_allowed = True
         elt.append_child(child)
 
@@ -44,11 +44,11 @@ def create_tree() -> tuple[SeqEltBase, list[int], list[str]]:
             ind += 1
             grandchild = SeqEltFactory.get_seq_elt('wait')(ind)
             ids.append(grandchild.id)
-            elts_repr.append(str(grandchild))
+            elts.append(grandchild)
             grandchild.children_allowed = True
             child.append_child(grandchild)
 
-    return elt, ids, elts_repr
+    return elt, ids, elts
 
 
 @pytest.fixture
@@ -117,7 +117,7 @@ def test_get_elt_by_id_and_get_root():
 
 def test_get_ids():
 
-    root, all_ids, all_reprs = create_tree()
+    root, all_ids, _ = create_tree()
     ids = root.get_ids()
 
     for id in ids:
@@ -125,9 +125,19 @@ def test_get_ids():
     for id in all_ids:
         assert id in ids
 
-    elts_repr = root.get_elts_as_str()
 
-    for _repr in elts_repr:
-        assert _repr in all_reprs
-    for _repr in all_reprs:
-        assert _repr in elts_repr
+def test_get_elts():
+
+    root, all_ids, all_elts = create_tree()
+    elts = root.get_elts()
+
+    for _elt in elts:
+        assert _elt in all_elts
+    for _elt in all_elts:
+        assert _elt in elts
+
+
+def compare_get_ids_get_elts():
+    root, all_ids, all_elts = create_tree()
+    for (id, elt) in zip(all_ids, all_elts):
+        assert id == elt.id
