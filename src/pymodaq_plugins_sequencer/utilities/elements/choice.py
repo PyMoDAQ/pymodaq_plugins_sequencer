@@ -102,7 +102,7 @@ class ChoiceElt(GrabElt):
             self.value_false_transition.update_target(target_elt.mstate)
 
     def set_go_to_false(self, value: int):
-        id = self.get_ids(without=(-2,))[value]
+        id = self.get_ids(without=self.without)[value]
         self.go_to_false = id
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
@@ -192,6 +192,12 @@ class ChoiceElt(GrabElt):
         return f'{super().__repr__()} - Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'
 
     def _execute(self, dte: DataToExport=None):
+        #check the transitions have valid target
+        if self.value_false_transition.targetState() is None:
+            self.value_false_transition.setTargetState(self.get_elt_from_id(self.go_to_false).mstate)
+        if self.value_true_transition.targetState() is None:
+            self.value_true_transition.setTargetState(self.get_elt_from_id(self.go_to_true).mstate)
+
         # get data from detectors if needed by the model
         self.filter_selected_wrt_manager()
         if len(self.selected) > 0:
@@ -203,6 +209,6 @@ class ChoiceElt(GrabElt):
             dte = DataToExport('Grab')
 
         boolean_result = self.choice_model.process_dte(dte)
-        self.go_to_signal.emit(self.go_to_true if boolean_result else self.go_to_false)
+        self.go_to_signal.emit(boolean_result)
 
 
