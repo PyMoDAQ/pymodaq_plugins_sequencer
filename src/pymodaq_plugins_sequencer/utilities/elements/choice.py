@@ -43,13 +43,10 @@ class ChoiceElt(GrabElt):
 
         self.value_true_transition = ValueTransition(
             self.go_to_signal, True,
-            self.get_elt_from_id(self.go_to_true).mstate)
+            )
 
         self.value_false_transition = ValueTransition(
-            self.go_to_signal, False,
-            self.get_elt_from_id(self.go_to_false).mstate)
-
-
+            self.go_to_signal, False)
 
         self.mstate.addTransition(self.value_true_transition)
         self.mstate.addTransition(self.value_false_transition)
@@ -75,39 +72,59 @@ class ChoiceElt(GrabElt):
         return self._go_to_true
 
     @go_to_true.setter
-    def go_to_true(self, value: int):
-        self._go_to_true = value
+    def go_to_true(self, value: str):
+        self._go_to_true = self.get_ids()[self.get_elts_as_str().index(value)]
+        target_elt = self.get_elt_from_id(self._go_to_true)
+        if target_elt is not None:
+            self.value_true_transition.update_target(target_elt.mstate)
+
+    def set_go_to_true(self, value: str):
+        self.go_to_true = value
 
     @property
     def go_to_false(self) -> int:
         return self._go_to_false
 
     @go_to_false.setter
-    def go_to_false(self, value: int):
-        self._go_to_false = value
+    def go_to_false(self, value: str):
+        self._go_to_false = self.get_ids()[self.get_elts_as_str().index(value)]
+        target_elt = self.get_elt_from_id(self._go_to_false)
+        if target_elt is not None:
+            self.value_false_transition.update_target(target_elt.mstate)
+
+    def set_go_to_false(self, value: str):
+        self.go_to_false = value
 
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
         base_widget = super()._create_widget(base_widget)
-        spin_box_true = SpinBox(int=True, value=self.go_to_true)
-        spin_box_true.setMinimum(0)
-        spin_box_true.setStyleSheet(
-            f"background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};")
-        spin_box_true.setToolTip('Go to this elt number if True')
-        spin_box_true.sigValueChanged.connect(self.set_go_to_true_from_spinbox)
-        base_widget.add_widget_top(spin_box_true)
 
-        spin_box_false = SpinBox(int=True, value=self.go_to_false)
-        spin_box_false.setMinimum(0)
-        spin_box_false.setStyleSheet(
-            f"background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};")
-        spin_box_false.setToolTip('Go to this elt number if False')
-        base_widget.add_widget_top(spin_box_false)
-        spin_box_false.sigValueChanged.connect(self.set_go_to_false_from_spinbox)
+        combo_true = ComboBox()
+        combo_true.addItems(self.get_elts_as_str())
+        combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_true)))
+        combo_true.setStyleSheet(
+            f"""background-color: #{hex(mkColor(get_theme().green).rgb())[2:]};
+                color: #{hex(mkColor(get_theme().base).rgb())[2:]};
+            """)
+        combo_true.currentTextChanged.connect(self.set_go_to_true)
+        combo_true.setToolTip('Go to this elt if True')
+        base_widget.add_widget_top(combo_true)
+
+        combo_false = ComboBox()
+        combo_false.addItems(self.get_elts_as_str())
+        combo_true.setCurrentText(str(self.get_elt_from_id(self.go_to_false)))
+        combo_false.setStyleSheet(
+            f"""background-color: #{hex(mkColor(get_theme().red).rgb())[2:]};
+                color: #{hex(mkColor(get_theme().base).rgb())[2:]};
+            """)
+        combo_false.currentTextChanged.connect(self.set_go_to_false)
+        combo_false.setToolTip('Go to this elt if False')
+        base_widget.add_widget_top(combo_false)
 
         combo = ComboBox()
         combo.addItems(choice_factory.models)
         combo.setCurrentText(choice_factory.models[0])
-        base_widget.add_widget_top(combo)
+        combo.setToolTip('Choice Model')
+        base_widget.insert_widget(combo, 1)
 
         parameter = ParameterManager()
         self.settings = weakref.ref(parameter)
@@ -118,11 +135,7 @@ class ChoiceElt(GrabElt):
 
         return base_widget
 
-    def set_go_to_true_from_spinbox(self, spinbox: SpinBox):
-        self.go_to_true = spinbox.value()
 
-    def set_go_to_false_from_spinbox(self, spinbox: SpinBox):
-        self.go_to_false = spinbox.value()
 
     def _save_data(self, dte: DataToExport = None):
         choice_bool = self.choice_model.process_dte(dte)

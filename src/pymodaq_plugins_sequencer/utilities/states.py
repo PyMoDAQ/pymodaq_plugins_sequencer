@@ -73,10 +73,16 @@ class CompositeState(QState):
 
 
 class ValueTransition(QSignalTransition):
-    def __init__(self, signal: QtCore.Signal, value: Any, target_state: QState):
+    def __init__(self, signal: QtCore.Signal, value: Any,
+                 target_state: QState | None = None,
+                 ):
         super().__init__(signal)
         self.value = value
-        self.setTargetState(target_state)
+        if target_state is not None:
+            self.setTargetState(target_state)
+
+    def update_target(self, state: QState):
+        self.setTargetState(state)
 
     def eventTest(self, event: QStateMachine.SignalEvent) -> bool:
         if not super().eventTest(event):
