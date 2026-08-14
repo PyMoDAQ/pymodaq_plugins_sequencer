@@ -133,6 +133,18 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def get_elts(self, parent_elt: 'SeqEltBase' = None,
                  without: Iterable[int]=()) -> list['SeqEltBase']:
+        """ Get as a list all element in the tree starting from parent_elt
+
+        Parameters
+        ----------
+        parent_elt: SeqEltBase, Optional (the root element is taken in this case)
+        without: tuple[int], optional (default: ())
+            tuple of ids to remove from the result
+
+        Returns
+        -------
+        list[SeqEltBase]: the retrieved elements
+        """
         elts = []
         if parent_elt is None:
             parent_elt = self.get_root_elt()
