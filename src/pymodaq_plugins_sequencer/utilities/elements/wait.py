@@ -84,3 +84,10 @@ class WaitElt(SeqEltBase):
 
     def __repr__(self):
         return f'{super().__repr__()} - {self.wait_time}ms'
+
+    def check_set_is_valid(self) -> bool:
+        if self.wait_time is None:
+            self.wait_time = 0
+        if self.wait_time < 0:
+            self.wait_time = 0
+        return True

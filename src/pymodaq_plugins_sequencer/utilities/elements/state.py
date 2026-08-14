@@ -150,7 +150,14 @@ class StateElt(SeqEltBase):
     def __repr__(self):
         return f'{super().__repr__()} - {self.state}'
 
-
     def size_hint(self) -> QtCore.QSize:
         size = super().size_hint()
         return QtCore.QSize(250, size.height())
+
+    def check_set_is_valid(self) -> bool:
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+        """
+        return self.state in self.state_manager.entries and self.dashboard.experiment_manager.entry_applied

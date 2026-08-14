@@ -336,10 +336,11 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         logger.debug(f'Elt {self} executing')
         self._execute(dte)
 
-    def is_valid(self) -> bool:
+    def check_set_is_valid(self) -> bool:
         """ Check the validity of the element
 
-        Will be called before executing the element
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
 
         To be reimplemented"""
         raise NotImplementedError

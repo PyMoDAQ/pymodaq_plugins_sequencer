@@ -85,3 +85,11 @@ class RepeatElt(SeqEltBase):
 
     def __repr__(self):
         return f'{super().__repr__()} - {self.n_repeat}'
+
+    def check_set_is_valid(self) -> bool:
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+        """
+        return self.n_repeat >= 1

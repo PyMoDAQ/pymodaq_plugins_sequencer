@@ -191,13 +191,13 @@ class ChoiceElt(GrabElt):
     def __repr__(self):
         return f'{super().__repr__()} - Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'
 
-    def _execute(self, dte: DataToExport=None):
-        #check the transitions have valid target
+    def update_target_states(self):
         if self.value_false_transition.targetState() is None:
             self.value_false_transition.setTargetState(self.get_elt_from_id(self.go_to_false).mstate)
         if self.value_true_transition.targetState() is None:
             self.value_true_transition.setTargetState(self.get_elt_from_id(self.go_to_true).mstate)
 
+    def _execute(self, dte: DataToExport=None):
         # get data from detectors if needed by the model
         self.filter_selected_wrt_manager()
         if len(self.selected) > 0:
@@ -211,4 +211,13 @@ class ChoiceElt(GrabElt):
         boolean_result = self.choice_model.process_dte(dte)
         self.go_to_signal.emit(boolean_result)
 
+    def check_set_is_valid(self) -> bool:
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+        """
+        self.update_target_states()
+        return not (self.value_false_transition.targetState() is None or
+                    self.value_true_transition.targetState() is None)
 

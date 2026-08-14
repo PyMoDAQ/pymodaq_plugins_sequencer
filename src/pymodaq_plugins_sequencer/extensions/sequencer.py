@@ -175,8 +175,8 @@ class Sequencer(CustomExt):
                 self.recursive_connect_elts(child)
 
     def is_valid(self):
-        for elt in self.root_elt.get_elts():
-            if not elt.is_valid():
+        for elt in self.root_elt.get_elts(without=(-2,)):
+            if not elt.check_set_is_valid():
                 return False
         return True
 
