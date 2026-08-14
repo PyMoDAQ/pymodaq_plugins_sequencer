@@ -42,6 +42,8 @@ class WaitElt(SeqEltBase):
                            int=True, suffix='ms', siPrefix=False)
         base_widget.add_widget_top(spin_box)
         spin_box.sigValueChanged.connect(self.set_wait_time_from_spinbox)
+        base_widget.give_focus_to(spin_box)
+
         return base_widget
 
     def set_wait_time_from_spinbox(self, spinbox: SpinBox):
