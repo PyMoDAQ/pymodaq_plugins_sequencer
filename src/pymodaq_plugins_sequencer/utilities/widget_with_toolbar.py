@@ -1,11 +1,8 @@
-from pyqtgraph import mkColor
+
 from qtpy import QtWidgets, QtCore
 
 
 from pymodaq_gui.utils.styling import Font
-from pymodaq_gui.utils.widgets.label import LabelWithFont
-from pymodaq_gui.managers.action_manager import ActionManager
-from qt_themes import get_theme
 
 
 class WidgetWithToolbar(QtWidgets.QWidget):
