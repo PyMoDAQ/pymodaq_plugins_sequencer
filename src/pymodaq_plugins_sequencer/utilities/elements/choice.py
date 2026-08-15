@@ -48,10 +48,11 @@ class ChoiceElt(SeqEltBase):
 
         self.value_true_transition = ValueTransition(
             self.go_to_signal, True,
+            source_state=self.mstate,
             )
 
         self.value_false_transition = ValueTransition(
-            self.go_to_signal, False)
+            self.go_to_signal, False, self.mstate)
 
         self.mstate.addTransition(self.value_true_transition)
         self.mstate.addTransition(self.value_false_transition)
@@ -211,6 +212,8 @@ class ChoiceElt(SeqEltBase):
 
     def recursive_apply_value(self, param1: Parameter, param2: Parameter):
         if param1.value() is not None and param2.value() is not None:
+            if 'limits' in param1.opts:
+                param1.setLimits(param2.opts['limits'])
             param1.setValue(param2.value())
         for ind_child in range(len(param1.children())):
             self.recursive_apply_value(param1.children()[ind_child],
