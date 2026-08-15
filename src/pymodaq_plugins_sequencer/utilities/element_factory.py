@@ -91,6 +91,16 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self.font = Font(font_name, font_size, isbold, isitalic)
         self.save_signal.connect(self.save_data)
 
+    def initialize_element(self):
+        """ Perform Initialization of the element if needed when called
+
+        Will be called automatically during the machine execution if the elt it
+        comes from (using the StateMachine) is not a child of itself
+
+        To be reimplemented
+        """
+        pass
+
     @property
     def mstate(self) -> CompositeState:
         if self._mstate is None:

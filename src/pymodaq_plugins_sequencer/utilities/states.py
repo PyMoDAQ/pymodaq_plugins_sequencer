@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 logger = set_logger(get_module_name(__file__))
 
-
+from PySide6.QtStateMachine import QStateMachine, QState
 
 class MyQFinalState(QFinalState):
     def onEntry(self, event, /):
@@ -41,6 +41,10 @@ class CompositeState(QState):
 
         self.addTransition(elt.done_signal, self.done_state)  # apply to all substates
 
+    def set_do_init(self, value: bool) -> None:
+        if value and hasattr(self._elt, 'initialize_element'):
+            self._elt.initialize_element()
+
     def onEntry(self, event, /):
         logger.debug(f'Entering {self.objectName()}')
 
@@ -59,8 +63,10 @@ class CompositeState(QState):
 
         self.setInitialState(self.execute_state)
 
-    def add_external_transition(self, signal: QtCore.Signal, target: QState):
-        self._external_transitions.append(self.addTransition(signal, target))
+    def add_external_transition(self, signal: QtCore.Signal,
+                                target: 'CompositeState'):
+        self._external_transitions.append(
+            self.addTransition(TrackedTransition(signal, self, target)))
 
     @property
     def external_transitions(self) -> list[QAbstractTransition]:
@@ -71,18 +77,46 @@ class CompositeState(QState):
             self.removeTransition(trans)
         self.setParent(None)
 
-
-class ValueTransition(QSignalTransition):
-    def __init__(self, signal: QtCore.Signal, value: Any,
-                 target_state: QState | None = None,
-                 ):
+class TrackedTransition(QSignalTransition):
+    def __init__(self, signal: QtCore.Signal,
+                 source_state: CompositeState,
+                 target_state: CompositeState = None, ):
         super().__init__(signal)
-        self.value = value
+        self.source_state = source_state
         if target_state is not None:
             self.setTargetState(target_state)
 
-    def update_target(self, state: QState):
+    def update_target(self, state: CompositeState):
         self.setTargetState(state)
+
+    @staticmethod
+    def is_child_of(child_state, target_parent):
+        """Walks up the parent chain to see if target_parent is an ancestor."""
+        current = child_state.parentState()
+        while current is not None:
+            if current == target_parent:
+                return True
+            current = current.parentState()  # Go up one more level
+        return False
+
+    def targetState(self) -> CompositeState:
+        return super().targetState()
+
+    def eventTest(self, event: QStateMachine.SignalEvent) -> bool:
+        if (isinstance(self.targetState(), CompositeState) and
+            not self.is_child_of(self.source_state, self.targetState())):
+                self.targetState().set_do_init(True)
+
+        return super().eventTest(event)
+
+
+class ValueTransition(TrackedTransition):
+    def __init__(self, signal: QtCore.Signal,
+                 value: Any,
+                 source_state: CompositeState,
+                 target_state: CompositeState = None, ):
+        super().__init__(signal, source_state, target_state)
+        self.value = value
 
     def eventTest(self, event: QStateMachine.SignalEvent) -> bool:
         if not super().eventTest(event):

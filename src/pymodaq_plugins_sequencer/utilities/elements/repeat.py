@@ -28,6 +28,9 @@ class RepeatElt(SeqEltBase):
         self._n_repeat: int = 3
         self._ind_execute = 0
 
+    def initialize_element(self):
+        self._ind_execute = 0
+
     def do_things_with_dashboard(self):
         pass
 
