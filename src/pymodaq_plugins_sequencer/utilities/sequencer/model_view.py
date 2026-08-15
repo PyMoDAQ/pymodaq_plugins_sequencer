@@ -209,6 +209,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         self.root_elt =  RootElt()
         self.insert_data(QtCore.QModelIndex(), 0, AddButtonPlaceholder())
         self._dashboard = dashboard
+        self._ind_elt: int = 0
 
     @property
     def dashboard(self) -> 'Dashboard':
@@ -390,11 +391,13 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
             ids.extend(self.get_ids(child))
         return ids
 
-    def get_new_id(self) -> int:
-        new_id = random.randint(0, 100)
+    def get_new_id(self, new_id: int = None) -> int:
+        if new_id is None:
+            new_id = max(self.get_ids()) +1
         ids = self.get_ids()
         while new_id in ids:
-            new_id = random.randint(0, 100)
+            new_id = new_id + 1
+        self._ind_elt = new_id
         return new_id
 
     def save_elements(self, file_path: Path) -> None:
@@ -471,7 +474,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 
 
         if action == Qt.DropAction.CopyAction:
-            new_id = self.get_new_id()
+            new_id = self.get_new_id(self._ind_elt)
             elt.id = new_id
 
         self.recursive_insert(parent, elt, row)
@@ -491,6 +494,8 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
         self.setup_menu()
         self._dashboard = dashboard
         self._current_path: Path = get_set_sequencer_path()
+
+        self.ind_elt = 0
 
     @property
     def dashboard(self) -> 'Dashboard':
@@ -547,14 +552,15 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
                 self.setIndexWidget(current_index, container)
                 pass
 
-    def get_new_id(self) -> int:
-        return self.model().get_new_id()
+    def get_new_id(self, new_id: int = None) -> int:
+        return self.model().get_new_id(new_id)
 
     def create_and_add(self, path: Iterable[str],
                        parent_index: QtCore.QModelIndex = None,
                        row: int = -1):
-
-        new_id = self.get_new_id()
+        self.ind_elt += 1
+        new_id = self.get_new_id(self.ind_elt)
+        self.ind_elt = new_id
         element = seq_factory.get_seq_elt(path[0].lower())(new_id,)
         element.dashboard = self.dashboard
         self.model().insert_data(parent_index=parent_index,

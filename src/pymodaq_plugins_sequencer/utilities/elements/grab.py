@@ -52,12 +52,14 @@ class GrabElt(SeqEltBase):
         self._selected = value
 
     def do_things_with_dashboard(self):
-        self.dashboard.experiment_manager.applied_entry.connect(self.update_detectors)
-        self.update_detectors()
+        self.dashboard.experiment_manager.applied_entry.connect(self.update_modules)
+        self.update_modules()
 
-    def update_detectors(self):
+    def update_modules(self):
         self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
-        self.modules_manager.selected_detectors_name = self.dashboard.modules_manager.detectors_all
+        self.modules_manager.selected_detectors_name = [det.title for det in  self.dashboard.modules_manager.detectors_all]
+        self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
+        self.modules_manager.selected_actuators_name = [act.title for act in self.dashboard.modules_manager.actuators_all]
         self.detectors = self.modules_manager.detectors_name
         self.filter_selected_wrt_manager()
 
@@ -142,3 +144,11 @@ class GrabElt(SeqEltBase):
 
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(250, 250)
+
+    def check_set_is_valid(self):
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+        """
+        return None

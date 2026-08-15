@@ -20,15 +20,16 @@ if __name__ == "__main__":
     widgets: list[QtWidgets.QWidget] = []
     elements: list[SeqEltBase] = []
     for ind_elt, elt_name in enumerate(seq_fact.elements):
-        elt: GrabElt = seq_fact.get_seq_elt(elt_name)(ind_elt)
-        if elt_name == 'grab':
-            elt.modules_manager.settings['detectors'] = dict(all_items=['yui', 'opoiu'],
-                                                            selected=[])
-        elements.append(elt)
-        widgets.append(elements[-1].create_widget())
-        widgets[-1].show()
-        elements[-1].done_signal.connect(print_dte)
-        print(widgets[-1].sizeHint())
+        if not (elt_name == 'button' or elt_name == 'root'):
+            elt: GrabElt = seq_fact.get_seq_elt(elt_name)(ind_elt)
+            if elt_name == 'grab':
+                elt.modules_manager.settings['detectors'] = dict(all_items=['yui', 'opoiu'],
+                                                                selected=[])
+            elements.append(elt)
+            widgets.append(elements[-1].create_widget())
+            widgets[-1].show()
+            elements[-1].done_signal.connect(print_dte)
+            print(widgets[-1].sizeHint())
 
     shared_ui.show()
 

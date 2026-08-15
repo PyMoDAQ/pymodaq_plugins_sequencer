@@ -1,6 +1,5 @@
 import weakref
 
-from numba.np.arrayobj import np_repeat
 from serializall import SerializableFactory
 
 from qtpy import QtCore
@@ -9,7 +8,7 @@ from pymodaq.utils.managers.modules import ModuleType
 from pymodaq_data import DataToExport
 from pymodaq_gui.parameter.pymodaq_ptypes.itemselect import ItemSelect
 from pymodaq_gui.utils.widgets import SpinBox
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
@@ -27,6 +26,9 @@ class RepeatElt(SeqEltBase):
         super().__init__(*args, **kwargs)
 
         self._n_repeat: int = 3
+        self._ind_execute = 0
+
+    def initialize_element(self):
         self._ind_execute = 0
 
     def do_things_with_dashboard(self):
@@ -85,3 +87,12 @@ class RepeatElt(SeqEltBase):
 
     def __repr__(self):
         return f'{super().__repr__()} - {self.n_repeat}'
+
+    def check_set_is_valid(self):
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+        """
+        if not (self.n_repeat >= 1):
+            raise ElementError(f'Element {self}: at least one repetition required')

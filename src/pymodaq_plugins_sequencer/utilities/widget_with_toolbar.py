@@ -1,11 +1,8 @@
-from pyqtgraph import mkColor
-from qtpy import QtWidgets
+
+from qtpy import QtWidgets, QtCore
 
 
 from pymodaq_gui.utils.styling import Font
-from pymodaq_gui.utils.widgets.label import LabelWithFont
-from pymodaq_gui.managers.action_manager import ActionManager
-from qt_themes import get_theme
 
 
 class WidgetWithToolbar(QtWidgets.QWidget):
@@ -29,9 +26,14 @@ class WidgetWithToolbar(QtWidgets.QWidget):
         self.top_widget.layout().addWidget(self.toolbar)
         self.top_widget.layout().addStretch()
 
+        self._widget_with_focus: QtWidgets.QWidget = None
+
         if subwidget is not None:
             self.layout().addWidget(subwidget)
         self.layout().addStretch()
+
+    def give_focus_to(self, widget: QtWidgets.QWidget):
+        self._widget_with_focus = widget
 
     @property
     def top_layout(self) -> QtWidgets.QHBoxLayout:
@@ -45,6 +47,15 @@ class WidgetWithToolbar(QtWidgets.QWidget):
     def insert_widget(self, widget=QtWidgets.QWidget, ind=1):
         self.layout().insertWidget(ind, widget)
 
+    def showEvent(self, event, /):
+        super().showEvent(event)
+        QtCore.QTimer.singleShot(0, self.set_focus)
+
+    def set_focus(self,):
+        if self._widget_with_focus is not None:
+            self._widget_with_focus.setFocus()
+            if hasattr(self._widget_with_focus, 'selectAll'):
+                self._widget_with_focus.selectAll()
 
 
 

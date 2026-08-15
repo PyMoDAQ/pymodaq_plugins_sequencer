@@ -6,7 +6,7 @@ from qtpy import QtWidgets, QtCore
 from serializall import SerializableFactory
 from pymodaq_data import DataToExport, DataWithAxes, DataRaw
 from pymodaq_gui.utils.widgets import SpinBox
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
@@ -42,6 +42,8 @@ class WaitElt(SeqEltBase):
                            int=True, suffix='ms', siPrefix=False)
         base_widget.add_widget_top(spin_box)
         spin_box.sigValueChanged.connect(self.set_wait_time_from_spinbox)
+        base_widget.give_focus_to(spin_box)
+
         return base_widget
 
     def set_wait_time_from_spinbox(self, spinbox: SpinBox):
@@ -84,3 +86,9 @@ class WaitElt(SeqEltBase):
 
     def __repr__(self):
         return f'{super().__repr__()} - {self.wait_time}ms'
+
+    def check_set_is_valid(self):
+        if self.wait_time is None:
+            raise ElementError(f'Wait time of element {self} should not be None')
+        if self.wait_time < 0:
+            raise ElementError(f'Wait time of element {self} should not be negative')

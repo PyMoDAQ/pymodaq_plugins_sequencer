@@ -1,7 +1,7 @@
 from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
-from typing import Tuple, Callable, TYPE_CHECKING, Any, Union
+from typing import Tuple, Callable, TYPE_CHECKING, Any, Union, Iterable
 
 from qtpy import QtCore, QtWidgets
 
@@ -11,7 +11,6 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory, SerializableBase
 
-from packages.pymodaq.tests.extensions.extension_loading_test import dashboard
 from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.managers.parameter_manager import ParameterManager
@@ -28,8 +27,10 @@ logger = set_logger(get_module_name(__file__))
 if TYPE_CHECKING:
     from pymodaq.dashboard import Dashboard
 
-
 ser_factory = SerializableFactory()
+
+class ElementError(Exception):
+    pass
 
 
 def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utilities'):
@@ -63,6 +64,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     children_signal = QtCore.Signal()
     done_signal = QtCore.Signal()
     save_signal = QtCore.Signal(DataToExport)
+    go_to_signal = QtCore.Signal(int)
 
     children_allowed = False
     params = []
@@ -79,7 +81,6 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self._mstate:  CompositeState = None
 
         self._id = id
-        self._go_to = id + 1
         self._dashboard: 'DashBoard' = None
         self._parent: 'SeqEltBase' = parent
 
@@ -92,6 +93,16 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         self.font = Font(font_name, font_size, isbold, isitalic)
         self.save_signal.connect(self.save_data)
+
+    def initialize_element(self):
+        """ Perform Initialization of the element if needed when called
+
+        Will be called automatically during the machine execution if the elt it
+        comes from (using the StateMachine) is not a child of itself
+
+        To be reimplemented
+        """
+        pass
 
     @property
     def mstate(self) -> CompositeState:
@@ -119,6 +130,78 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     def set_parent(self, value: 'SeqEltBase'):
         """ to be used as a slot or ..."""
         self.parent = value
+
+    def get_root_elt(self) -> 'SeqEltBase':
+        root = self
+        while root.parent is not None:
+            root = root.parent
+        return root
+
+    def get_ids(self, parent_elt: 'SeqEltBase' = None,
+                without_ids: Iterable[int] = (),
+                without_types: Iterable[type['SeqEltBase']] = ()) -> list[int]:
+        """ Get the ids of the existing elements"""
+        return [elt.id for elt in self.get_elts(parent_elt, without_ids, without_types)]
+
+    def get_elts(self, parent_elt: 'SeqEltBase' = None,
+                 without_ids: Iterable[int] = (),
+                 without_types: Iterable[type['SeqEltBase']] = ()) -> list['SeqEltBase']:
+        """ Get as a list all element in the tree starting from parent_elt
+
+        Parameters
+        ----------
+        without_types
+        parent_elt: SeqEltBase, Optional (the root element is taken in this case)
+        without_ids: tuple[int], optional (default: ())
+            tuple of ids to remove from the result
+        without_types: tuple[SeqEltBase], optional (default: ())
+            tuple of elements type to remove from the result
+
+        Returns
+        -------
+        list[SeqEltBase]: the retrieved elements
+        """
+        elts = []
+        if parent_elt is None:
+            parent_elt = self.get_root_elt()
+        for child in parent_elt.children:
+            if child.id not in without_ids and type(child) not in without_types:
+                elts.append(child)
+            elts.extend(self.get_elts(child, without_ids=without_ids,
+                                      without_types=without_types))
+        return elts
+
+    def get_elts_as_str(self, parent_elt: 'SeqEltBase' = None,
+                        without_ids: Iterable[int] = (),
+                        without_types: Iterable[type['SeqEltBase']] = ()) -> list[str]:
+        """ Get the elements name of all existing elements"""
+        return [str(elt) for elt in self.get_elts(parent_elt, without_ids, without_types)]
+
+    def get_elt_from_id(self, elt_id: int,
+                        start_parent: 'SeqEltBase' = None,
+                        ) -> Union['SeqEltBase', None]:
+        """ Get the Element having the specified id  starting from start_parent in the tree
+
+        Parameters
+        ----------
+        elt_id : int
+        start_parent : SeqEltBase
+            Optional, if not specified or None, start from the Root of this element hierarchy
+
+        Returns
+        -------
+        SeqEltBase or None
+        """
+        if start_parent is None:
+            start_parent = self.get_root_elt()
+        if start_parent.id == elt_id:
+            return start_parent
+        elif start_parent.children_allowed:
+            for child in start_parent.children:
+                target_elt = self.get_elt_from_id(elt_id, child)
+                if target_elt is not None:
+                    return target_elt
+        return None
 
     @property
     def children(self) -> list['SeqEltBase']:
@@ -165,7 +248,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):
             return False
-        for attr in ('id', 'name', 'go_to'):
+        for attr in ('id', 'name',):
             if getattr(self, attr) != getattr(other, attr):
                 return False
         return self._eq(other)
@@ -185,15 +268,6 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     @name.setter
     def name(self, value: str):
         self.elt_name = value
-
-    @property
-    def go_to(self):
-        """ Get/Set the next ID the Sequencer should go to """
-        return self._go_to
-
-    @go_to.setter
-    def go_to(self, value: int):
-        self._go_to = value
 
     def _create_base_widget(self, parent: QtWidgets.QWidget) -> WidgetWithToolbar:
         """ Base Widget"""
@@ -230,7 +304,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     @classmethod
     def serialize(cls, obj: 'SeqEltBase') -> bytes:
         bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id, obj._go_to))
+        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id))
         bytes_string += obj.serialize_custom()
         if obj.children_allowed:
             bytes_string += ser_factory.get_apply_serializer(obj.children)
@@ -245,9 +319,9 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         SeqEltBase: the decoded object
         bytes: the remaining bytes string if any
         """
-        (elt_name, id, go_to) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        (elt_name, id) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
         seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
-        seq_elt.go_to = go_to
+
         remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
         if seq_elt.children_allowed:
             children, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
@@ -277,8 +351,19 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         Should emit the done_signal when executed (could be with empty DataToExport)
         """
-        logger.debug(f'Elt {self} executed')
+        logger.debug(f'Elt {self} executing')
         self._execute(dte)
+
+    def check_set_is_valid(self):
+        """ Check the validity of the element
+
+        Will be called before executing the element. Try to make sure the element is valid or return None
+        if the user may do something!
+
+        To be reimplemented
+
+        if not valid should raise an ElementError exception else return None"""
+        raise NotImplementedError
 
     def _execute(self, dte: DataToExport = None):
         """ Execute the Element
