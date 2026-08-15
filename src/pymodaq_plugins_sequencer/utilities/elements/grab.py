@@ -145,10 +145,10 @@ class GrabElt(SeqEltBase):
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(250, 250)
 
-    def check_set_is_valid(self) -> bool:
+    def check_set_is_valid(self):
         """ Check the validity of the element
 
         Will be called before executing the element. Try to make sure the element is valid or return None
         if the user may do something!
         """
-        return True
+        return None

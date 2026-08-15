@@ -19,7 +19,7 @@ from pymodaq.utils.managers.modules_manager import ModulesManager
 from pymodaq_gui.utils.widgets.combo import ComboBox
 from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
 from pymodaq_plugins_sequencer.utilities.sequencer.model_view import AddButtonPlaceholder
 from pymodaq_plugins_sequencer.utilities.states import ValueTransition
@@ -247,6 +247,9 @@ class ChoiceElt(SeqEltBase):
         if the user may do something!
         """
         self.update_target_states()
-        return not (self.value_false_transition.targetState() is None or
-                    self.value_true_transition.targetState() is None)
+        if self.value_false_transition.targetState() is None:
+            raise ElementError(f'Element {self} has no existing False value target state')
+        if self.value_true_transition.targetState() is None:
+            raise ElementError(f'Element {self} has no existing True value target state')
+        self.choice_model.check_set_is_valid()
 

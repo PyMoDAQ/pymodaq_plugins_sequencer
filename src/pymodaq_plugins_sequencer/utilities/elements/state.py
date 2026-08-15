@@ -11,7 +11,7 @@ from pymodaq.utils.managers.state.state_manager import StateManager
 from pymodaq_gui.managers.manager_base import ManagerActions
 from pymodaq_gui.utils.widgets.combo import ComboBox
 
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
@@ -160,4 +160,9 @@ class StateElt(SeqEltBase):
         Will be called before executing the element. Try to make sure the element is valid or return None
         if the user may do something!
         """
-        return self.state in self.state_manager.entries and self.dashboard.experiment_manager.entry_applied
+        if not self.dashboard.experiment_manager.entry_applied:
+            raise ElementError('No Experiment has been applied in the DashBoard')
+
+        if self.state not in self.state_manager.entries:
+            raise ElementError(
+                f'Error with element {self}: State {self.state} not available for the current experiment')

@@ -1,6 +1,7 @@
 from pymodaq_data import DataToExport, DataDim
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
+from pymodaq_plugins_sequencer.utilities.element_factory import ElementError
 
 
 @ChoiceModelFactory.register_choice()
@@ -54,3 +55,16 @@ class ThresholdChoiceModel(ChoiceModelBase):
             return dwa.value() > self.settings['threshold']
         else:
             return dwa.value() < self.settings['threshold']
+
+    def check_set_is_valid(self):
+        """ Check if the current settings of this model are valid
+        """
+        if not self.parent_elt.dashboard.experiment_manager.entry_applied:
+            raise ElementError('No Experiment has been applied in the DashBoard')
+        if len(self.settings['detectors']['selected']) != 0:
+            raise ElementError(f'Element {self.parent_elt} has no detector selected ')
+        if (self.settings['detectors']['selected'] not in
+                self.parent_elt.dashboard.modules_manager.detectors_name):
+            raise ElementError(f'Element {self.parent_elt} : the selected detector is not existing in the DashBoard')
+        if self.settings['data_name'] is None or self.settings['data_name'] == '':
+            raise ElementError(f'Element {self.parent_elt} has no data name set')

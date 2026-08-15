@@ -47,6 +47,15 @@ class ChoiceModelBase(ParameterManager):
     def execute(self, dte: DataToExport):
         pass
 
+    def check_set_is_valid(self):
+        """ Check if the current settings of this model are valid
+
+        To be reimplemented
+
+        Should raise ElementError if not valid
+        """
+        return None
+
 
 def get_choice_models():
     """

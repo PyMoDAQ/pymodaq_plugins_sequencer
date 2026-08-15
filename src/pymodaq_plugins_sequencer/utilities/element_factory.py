@@ -29,6 +29,9 @@ if TYPE_CHECKING:
 
 ser_factory = SerializableFactory()
 
+class ElementError(Exception):
+    pass
+
 
 def register_elements(parent_module_name: str = 'pymodaq_plugins_sequencer.utilities'):
     elements = []
@@ -351,13 +354,15 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         logger.debug(f'Elt {self} executing')
         self._execute(dte)
 
-    def check_set_is_valid(self) -> bool:
+    def check_set_is_valid(self):
         """ Check the validity of the element
 
         Will be called before executing the element. Try to make sure the element is valid or return None
         if the user may do something!
 
-        To be reimplemented"""
+        To be reimplemented
+
+        if not valid should raise an ElementError exception else return None"""
         raise NotImplementedError
 
     def _execute(self, dte: DataToExport = None):

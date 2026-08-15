@@ -5,7 +5,7 @@ from qtpy import QtWidgets, QtCore
 
 from pymodaq_gui import utils as gutils
 from pymodaq_gui.utils.shared_ui import MenuToolbarNames
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, ElementError
 from pymodaq_plugins_sequencer.utilities.sequencer.model_view import SequenceTreeView, SequenceTreeModel, \
     SequenceWidgetDelegate, RootElt, AddButtonPlaceholder
 from pymodaq_utils.config import Config, GlobalConfig
@@ -175,10 +175,14 @@ class Sequencer(CustomExt):
                 self.recursive_connect_elts(child)
 
     def is_valid(self):
+        res = True
         for elt in self.root_elt.get_elts(without_types=(AddButtonPlaceholder,)):
-            if not elt.check_set_is_valid():
-                return False
-        return True
+            try:
+                elt.check_set_is_valid()
+            except ElementError as e:
+                res = False
+                logger.error(str(e))
+        return res
 
     def start_sequence(self):
         self.label.setText('Machine starting')

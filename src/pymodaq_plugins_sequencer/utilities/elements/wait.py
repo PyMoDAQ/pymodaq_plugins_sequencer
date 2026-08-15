@@ -6,7 +6,7 @@ from qtpy import QtWidgets, QtCore
 from serializall import SerializableFactory
 from pymodaq_data import DataToExport, DataWithAxes, DataRaw
 from pymodaq_gui.utils.widgets import SpinBox
-from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
+from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
 
@@ -87,9 +87,8 @@ class WaitElt(SeqEltBase):
     def __repr__(self):
         return f'{super().__repr__()} - {self.wait_time}ms'
 
-    def check_set_is_valid(self) -> bool:
+    def check_set_is_valid(self):
         if self.wait_time is None:
-            self.wait_time = 0
+            raise ElementError(f'Wait time of element {self} should not be None')
         if self.wait_time < 0:
-            self.wait_time = 0
-        return True
+            raise ElementError(f'Wait time of element {self} should not be negative')
