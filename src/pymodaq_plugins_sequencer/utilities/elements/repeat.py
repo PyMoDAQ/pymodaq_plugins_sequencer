@@ -46,6 +46,7 @@ class RepeatElt(SeqEltBase):
         spinbox = SpinBox(parent=base_widget, int=True, value=self.n_repeat)
         base_widget.add_widget_top(spinbox)
         spinbox.sigValueChanged.connect(self.set_repeat_from_spinbox)
+        base_widget.give_focus_to(spinbox)
         return base_widget
 
     def set_repeat_from_spinbox(self, spinbox: SpinBox):
