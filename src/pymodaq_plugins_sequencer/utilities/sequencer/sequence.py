@@ -50,10 +50,10 @@ class Sequence(CustomExt):
 
         self.parent.setLayout(QtWidgets.QVBoxLayout())
 
-        self.view = SequenceTreeView(parent_app=self,
+        self.view = SequenceTreeView(parent_sequence=self,
                                      parent=self.parent,
                                      dashboard=self.dashboard)
-        self._model = SequenceTreeModel(parent_app=self,
+        self._model = SequenceTreeModel(parent_sequence=self,
                                         dashboard=self.dashboard)
         self.view.setModel(self._model)
 

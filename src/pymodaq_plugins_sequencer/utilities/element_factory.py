@@ -75,7 +75,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def __init__(self, id: int,
                  parent: 'SeqEltBase'= None,
-                 parent_app: 'Sequence' = None,
+                 parent_sequence: 'Sequence' = None,
                  **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
@@ -84,7 +84,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         self._id = id
         self._dashboard: 'DashBoard' = None
-        self._parent_app = parent_app
+        self._parent_sequence = parent_sequence
         self._parent: 'SeqEltBase' = parent
 
         self._children = []
@@ -249,17 +249,17 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self.dashboard = dashboard    @property
 
     @property
-    def parent_app(self) -> 'Sequence':
-        return self._parent_app
+    def parent_sequence(self) -> 'Sequence':
+        return self._parent_sequence
 
-    @parent_app.setter
-    def parent_app(self, value: 'Sequence'):
+    @parent_sequence.setter
+    def parent_sequence(self, value: 'Sequence'):
         """ """
-        self._parent_app = value
-        self.do_things_with_parent_app()
+        self._parent_sequence = value
+        self.do_things_with_parent_seqeunce()
 
-    def set_parent_app(self, parent_app: 'Sequence'):
-        self.parent_app = parent_app
+    def set_parent_sequence(self, parent_sequence: 'Sequence'):
+        self.parent_sequence = parent_sequence
 
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):
@@ -444,7 +444,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         """
         pass
 
-    def do_things_with_parent_app(self):
+    def do_things_with_parent_sequence(self):
         """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
 
         Do whatever is needed to instantiate your element with the Dashboard

@@ -132,18 +132,17 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class SequenceTreeModel(QtCore.QAbstractItemModel):
-    def __init__(self, parent_app: 'Sequence' = None,
+    def __init__(self, parent_sequence: 'Sequence' = None,
                  parent: QtCore.QObject = None,
                  dashboard: 'Dashboard' = None
                  ):
 
         super().__init__(parent)
-        self.root_elt =  RootElt(parent_app=parent_app)
+        self.root_elt =  RootElt(parent_sequence=parent_sequence)
         self.insert_data(QtCore.QModelIndex(), 0, AddButtonPlaceholder())
         self._dashboard = dashboard
         self._ind_elt: int = 0
-        self.parent_app = parent_app
-        self.parent_app = parent_app
+        self.parent_sequence = parent_sequence
 
     @property
     def dashboard(self) -> 'Dashboard':
@@ -372,7 +371,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         if parent_index is not None:
             self.insert_data(parent_index=parent_index, row=row, new_object=elt)
             elt.dashboard = self.dashboard
-            elt.parent_app = self.parent_app
+            elt.parent_sequence = self.parent_sequence
             elt.parent_elt = elt
 
         # 3) Check if it has children and call the method on them
@@ -430,14 +429,14 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
 class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
     """
     """
-    def __init__(self, parent_app: 'Sequence' = None, dashboard: 'Dashboard' = None, parent=None):
+    def __init__(self, parent_sequence: 'Sequence' = None, dashboard: 'Dashboard' = None, parent=None):
         QtWidgets.QTreeView.__init__(self, parent)
         ActionManager.__init__(self)
 
         self.setup_menu()
         self._dashboard = dashboard
         self._current_path: Path = get_set_sequencer_path()
-        self.parent_app = parent_app
+        self.parent_sequence = parent_sequence
 
         self.ind_elt = 0
 
@@ -506,7 +505,7 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
         new_id = self.get_new_id(self.ind_elt)
         self.ind_elt = new_id
         element = seq_factory.get_seq_elt(path[0].lower())(new_id,
-                                                           parent_app=self.parent_app)
+                                                           parent_sequence=self.parent_sequence)
         element.dashboard = self.dashboard
 
         self.model().insert_data(parent_index=parent_index,

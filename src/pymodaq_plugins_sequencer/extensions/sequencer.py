@@ -49,10 +49,10 @@ class Sequencer(CustomExt):
         self.add_sequence('Main')
 
     def add_sequence(self, name: str = 'Main'):
-        SequenceElt.sequences.append(name)
         widget = QtWidgets.QWidget()
         self.sequences[name.lower()] = Sequence(name, widget, self.dashboard)
         self.sequence_container.layout().addWidget(widget)
+        SequenceElt.sequences.append(self.sequences[name.lower()])
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
         """Non mandatory method to be subclassed in order to create a menubar

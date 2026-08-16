@@ -5,11 +5,15 @@ import numpy as np
 from qtpy import QtWidgets, QtCore
 
 from serializall import SerializableFactory
-from pymodaq_data import DataToExport, DataWithAxes, DataRaw
-from pymodaq_gui.utils.widgets import SpinBox
+from pymodaq_data import DataToExport
+
 from pymodaq_gui.utils.widgets.combo import ComboBox
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
+from pymodaq_utils.utils import find_objects_in_list_from_attr_name_val
+
+if TYPE_CHECKING:
+    from pymodaq_plugins_sequencer.utilities.sequencer.sequence import Sequence
 
 
 ser_factory = SerializableFactory()
@@ -20,28 +24,33 @@ class SequenceElt(SeqEltBase):
 
     elt_name = 'sequence'
     children_allowed = False
-    sequences: list[str] = []
+    sequences: list['Sequence'] = []
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._sequence: str = None if len(self.get_sequences()) == 0 else self.get_sequences()[0]
+        self._sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
 
         self._combo: weakref.ref[ComboBox] | None = None  # weakref to the combobox holding the states
 
-    def get_sequences(self):
+    def get_sequences(self) -> list['Sequence']:
         """ Get the list of Sequences that can be started, removing the one this element belong to"""
-        sequences = self.sequences[:]
-        if self.parent_app is not None:
-            sequences.remove(self.parent_app.title)
+        sequences = list(self.sequences)
+        if self.parent_sequence is not None:
+            sequences.remove(find_objects_in_list_from_attr_name_val(
+                sequences, 'title', self.parent_sequence.title)[0])
         return sequences
 
-    def do_things_with_parent_app(self):
+    def get_sequences_name(self) -> list[str]:
+        """ Get the list of Sequences that can be started, removing the one this element belong to"""
+        return [seq.title for seq in self.get_sequences()]
+
+    def do_things_with_parent_sequence(self):
         """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
 
         Do whatever is needed to instantiate your element with the Dashboard
         """
-        self._sequence: str = None if len(self.get_sequences()) == 0 else self.get_sequences()[0]
+        self._sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
 
     @property
     def sequence(self) -> str:
@@ -53,7 +62,7 @@ class SequenceElt(SeqEltBase):
 
     def update_combo_sequences(self):
         if self._combo is not None and self._combo() is not None:
-            self._combo().set_items(self.sequences)
+            self._combo().set_items(self.get_sequences_name())
 
     @QtCore.Slot(str)
     def set_sequence(self, value: str):
@@ -65,7 +74,7 @@ class SequenceElt(SeqEltBase):
     def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
 
         combo = ComboBox(base_widget)
-        combo.set_items(self.get_sequences())
+        combo.set_items(self.get_sequences_name())
         base_widget.add_widget_top(combo)
         combo.setCurrentText(self.sequence)
         combo.currentTextChanged.connect(self.set_sequence)
@@ -84,19 +93,17 @@ class SequenceElt(SeqEltBase):
         to be reimplemented
         """
         return {'sequence': self.sequence,
-                'sequences': self.sequences, }
+                }
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
-        self.sequences = dict_config.pop('sequences')
         self.sequence = dict_config.pop('sequence')
 
     def _eq(self, other: 'SequenceElt'):
         """ Custom method to reimplement to assert two elements are equals"""
-        return (self.sequences == other.sequences and
-                self.sequence == other.sequence)
+        return (self.sequence == other.sequence)
 
     def __repr__(self):
         return f'{super().__repr__()} - {self.sequence}'
