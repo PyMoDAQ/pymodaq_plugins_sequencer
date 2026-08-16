@@ -15,6 +15,15 @@ logger = set_logger(get_module_name(__file__))
 
 from PySide6.QtStateMachine import QStateMachine, QState
 
+
+class MyState(QState):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.incoming_transition: TrackedTransition | None = None  # This will hold the transition object
+        self.source_state: MyState | CompositeState | None = None
+
+
 class MyQFinalState(QFinalState):
     def onEntry(self, event, /):
         logger.debug(f'Entering  {self.objectName()}')
@@ -23,7 +32,7 @@ class MyQFinalState(QFinalState):
         logger.debug(f'Exiting {self.objectName()}')
 
 
-class CompositeState(QState):
+class CompositeState(MyState):
     def __init__(self, elt: 'SeqEltBase', *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -47,9 +56,11 @@ class CompositeState(QState):
 
     def onEntry(self, event, /):
         logger.debug(f'Entering {self.objectName()}')
+        super().onEntry(event, )
 
     def onExit(self, event, /):
         logger.debug(f'Exiting {self.objectName()}')
+        super().onExit(event, )
 
     def setup_states(self):
         self.setObjectName(f'State of the elt: {self._elt}')
@@ -60,7 +71,6 @@ class CompositeState(QState):
         self.done_state.setObjectName(f'FinalState of the elt: {self._elt}')
         self.children_state = QState(self)
         self.children_state.setObjectName(f'ChildrenState of the elt: {self._elt}')
-
         self.setInitialState(self.execute_state)
 
     def add_external_transition(self, signal: QtCore.Signal,
@@ -79,8 +89,8 @@ class CompositeState(QState):
 
 class TrackedTransition(QSignalTransition):
     def __init__(self, signal: QtCore.Signal,
-                 source_state: CompositeState,
-                 target_state: CompositeState = None, ):
+                 source_state: CompositeState | MyState,
+                 target_state: CompositeState | MyState = None, ):
         super().__init__(signal)
         self.source_state = source_state
         if target_state is not None:
@@ -88,6 +98,15 @@ class TrackedTransition(QSignalTransition):
 
     def update_target(self, state: CompositeState):
         self.setTargetState(state)
+
+    def onTransition(self, event: QtCore.QEvent):
+        # This runs right before the target state's onEntry()
+        super().onTransition(event)
+
+        # Save a reference to this transition in the target state
+        target: MyState = self.targetState()
+        if target:
+            target.source_state = self.source_state
 
     @staticmethod
     def is_child_of(child_state, target_parent):
@@ -110,11 +129,32 @@ class TrackedTransition(QSignalTransition):
         return super().eventTest(event)
 
 
+class InterruptState(MyState):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sender_state: QState | CompositeState = None
+        self.setObjectName('InterruptState of the Sequencer')
+
+    def onEntry(self, event: QtCore.QEvent):
+        # Always call the base class implementation first
+        logger.debug(f'Entering {self.objectName()}')
+        super().onEntry(event)
+
+        if event is not None:
+            # Check if the event came from a transition signal
+            if event.type() == QtCore.QEvent.Type.StateMachineSignal:
+                # Cast or treat as SignalEvent
+                sig_event: QStateMachine.SignalEvent = event
+                # Get the object that sent the signal
+                self.sender_state = sig_event.sender()
+
+
 class ValueTransition(TrackedTransition):
     def __init__(self, signal: QtCore.Signal,
                  value: Any,
-                 source_state: CompositeState,
-                 target_state: CompositeState = None, ):
+                 source_state: CompositeState | QState,
+                 target_state: CompositeState | QState = None, ):
         super().__init__(signal, source_state, target_state)
         self.value = value
 
