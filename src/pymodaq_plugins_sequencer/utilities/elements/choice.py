@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 import numpy as np
 import weakref
 
 from pymodaq_gui.parameter.utils import ParameterWithPath, Parameter
-from pymodaq_gui.utils.widget_sync import WidgetSync
 from pyqtgraph import mkColor
 
 from qtpy import QtWidgets, QtCore
@@ -21,7 +20,7 @@ from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelB
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
-from pymodaq_plugins_sequencer.utilities.sequencer.model_view import AddButtonPlaceholder
+from pymodaq_plugins_sequencer.utilities.elements.button import AddButtonPlaceholder
 from pymodaq_plugins_sequencer.utilities.states import ValueTransition
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 
@@ -209,6 +208,25 @@ class ChoiceElt(SeqEltBase):
         self.recursive_apply_value(self.choice_model.settings,
                                    pwp.parameter)
         return remaining_bytes
+
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
+
+        to be reimplemented
+        """
+        dict_config =  {'go_to_true': self.go_to_true,
+                        'go_to_false': self.go_to_false,
+                        'choice_model': self.choice_model.model_name}
+        self.choice_model.to_dict(dict_config)
+        return dict_config
+
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+        """
+        self.detectors = dict_config.pop('detectors')
+        self.selected = dict_config.pop('selected')
 
     def recursive_apply_value(self, param1: Parameter, param2: Parameter):
         if param1.value() is not None and param2.value() is not None:

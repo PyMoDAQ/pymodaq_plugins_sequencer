@@ -1,7 +1,7 @@
 from pathlib import Path
 from importlib import import_module
 from dataclasses import dataclass, Field, InitVar
-from typing import Tuple, Callable, TYPE_CHECKING, Any, Union, Iterable
+from typing import Tuple, Callable, TYPE_CHECKING, Any, Union, Iterable, Mapping
 
 from qtpy import QtCore, QtWidgets
 
@@ -303,6 +303,12 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     @classmethod
     def serialize(cls, obj: 'SeqEltBase') -> bytes:
+        """Convert a SeqEltBase object into a bytes string
+
+        Returns
+        -------
+        bytes: the bytes string
+        """
         bytes_string = b''
         bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id))
         bytes_string += obj.serialize_custom()
@@ -329,6 +335,34 @@ class SeqEltBase(QtCore.QObject, ActionManager):
                 seq_elt.append_child(child)
 
         return seq_elt, remaining_bytes
+
+    def to_dict(self) -> dict[str, Any]:
+        """ Serialization in a dictionary"""
+        dict_config: dict[str, Any] = {'elt_name': self.elt_name,
+                                       'id': self.id,}
+        dict_config.update(self.to_dict_custom())
+        if self.children_allowed:
+            dict_config['children'] = []
+            for child in self.children:
+                dict_config['children'].append(child.to_dict())
+        return dict_config
+
+    @classmethod
+    def from_dict(cls, dict_config: dict[str, Any]) -> 'SeqEltBase':
+        """ Deserialization from a dictionary
+
+        Returns
+        -------
+        SeqEltBase: the deserialized object
+        """
+        elt_name = dict_config.pop('elt_name')
+        id = dict_config.pop('id')
+        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
+        seq_elt.from_dict_custom(dict_config)
+        if 'children' in dict_config:
+            for child in dict_config['children']:
+                seq_elt.append_child(cls.from_dict(child))
+        return seq_elt
 
     def create_widget(self, parent: QtWidgets.QWidget = None) -> QtWidgets.QWidget:
         """ Public API to be used to create the widget representing this elt """
@@ -388,6 +422,22 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         Returns
         -------
         bytes: the remaining bytes string if any
+        """
+        raise NotImplementedError
+
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
+
+        to be reimplemented
+        """
+        raise NotImplementedError
+
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+
+        to be reimplemented
         """
         raise NotImplementedError
 

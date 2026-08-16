@@ -1,11 +1,9 @@
-import inspect
+
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from pymodaq.control_modules.daq_move import DAQ_Move
-from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.utils.managers.modules import ModulesManager
 from pymodaq_data import DataToExport
 from pymodaq_gui.managers.parameter_manager import ParameterManager
@@ -55,6 +53,22 @@ class ChoiceModelBase(ParameterManager):
         Should raise ElementError if not valid
         """
         return None
+
+    def to_dict(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this model params
+
+        to be reimplemented
+        """
+        return {}
+
+    def from_dict(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+
+        to be reimplemented
+        """
+        pass
 
 
 def get_choice_models():

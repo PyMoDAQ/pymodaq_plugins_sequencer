@@ -1,3 +1,5 @@
+from typing import Any
+
 from pymodaq_data import DataToExport, DataDim
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
@@ -68,3 +70,22 @@ class ThresholdChoiceModel(ChoiceModelBase):
             raise ElementError(f'Element {self.parent_elt} : the selected detector is not existing in the DashBoard')
         if self.settings['data_name'] is None or self.settings['data_name'] == '':
             raise ElementError(f'Element {self.parent_elt} has no data name set')
+
+    def to_dict(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this model params
+        """
+        return {'detectors': self.settings['detectors'],
+                'threshold': self.settings['threshold'],
+                'direction': self.settings['direction'],
+                'data_name': self.settings['data_name'],
+                }
+
+    def from_dict(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+        """
+        self.settings['detectors'] = dict_config.pop('detectors')
+        self.settings['threshold'] = dict_config.pop('threshold')
+        self.settings['direction'] = dict_config.pop('direction')
+        self.settings['data_name'] = dict_config.pop('data_name')

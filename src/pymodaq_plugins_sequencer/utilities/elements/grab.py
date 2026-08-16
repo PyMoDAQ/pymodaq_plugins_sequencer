@@ -1,4 +1,6 @@
+from typing import Any
 import weakref
+
 from serializall import SerializableFactory
 
 from qtpy import QtCore
@@ -133,6 +135,22 @@ class GrabElt(SeqEltBase):
         self.selected = selected
 
         return remaining_bytes
+
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
+
+        to be reimplemented
+        """
+        return {'detectors': self.detectors,
+                'selected': self.selected}
+
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+        """
+        self.detectors = dict_config.pop('detectors')
+        self.selected = dict_config.pop('selected')
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""

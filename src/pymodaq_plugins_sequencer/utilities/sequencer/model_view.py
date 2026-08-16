@@ -1,6 +1,5 @@
 from pathlib import Path
-import random
-from typing import Any, Iterable, TYPE_CHECKING
+from typing import Iterable, TYPE_CHECKING
 
 from qtpy.QtWidgets import QStyle
 from qtpy import QtWidgets, QtCore
@@ -11,13 +10,14 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory
 
-from pymodaq_data import DataToExport
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
 
 
 from ..element_factory import SeqEltFactory, SeqEltBase, MIME_TYPE
+from ..elements.button import AddButtonPlaceholder
+from ..elements.root import RootElt
 from ..styling import button_style, menu_style, color_from_depth
 from ...utils import get_set_sequencer_path
 
@@ -124,79 +124,6 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
         painter.restore()
         super().paint(painter, option, index)
-
-
-@SerializableFactory.register_decorator()
-@SeqEltFactory.register_elt()
-class RootElt(SeqEltBase):
-    elt_name = 'root'
-    children_allowed = True
-
-    def __init__(self, id: int = -1, parent=None):  # should keep the signature of the base
-        # Pass a specific string or ID to distinguish it from standard data
-        super().__init__(id=-1, parent=parent)
-        self._ind_execute: int = 0
-
-    def serialize_custom(self) -> bytes:
-        return b''
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        return bytes_str
-
-    def _eq(self, other: 'SeqEltBase'):
-        return True
-
-    def _execute(self, dte: DataToExport = None):
-        if self._ind_execute == 0:
-            self._ind_execute += 1
-            self.children_signal.emit()
-        else:
-            self._ind_execute = 0
-            self.done_signal.emit()
-
-
-@SerializableFactory.register_decorator()
-@SeqEltFactory.register_elt()
-class AddButtonPlaceholder(SeqEltBase):
-    elt_name = 'button'
-    children_allowed = False
-
-    def __init__(self, id: int = -2, parent=None):  # should keep the signature of the base
-        # Pass a specific string or ID to distinguish it from standard data
-        super().__init__(id=-2, parent=parent)
-
-    def create_widget(self, parent=None) -> QtWidgets.QWidget:
-        return MenuButton('Add Element',
-                          [elt.capitalize() for elt in seq_factory.elements if not
-                          (elt == AddButtonPlaceholder.elt_name or
-                           elt == RootElt.elt_name)],
-                          update_button_text=False,
-                          parent=parent)
-
-    def _eq(self, other: 'SeqEltBase'):
-        return True
-
-    def _execute(self, dte: DataToExport = None):
-        self.done_signal.emit()
-
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        return b''
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        return bytes_str
 
 
 class SequenceTreeModel(QtCore.QAbstractItemModel):
@@ -585,7 +512,7 @@ class SequenceTreeView(QtWidgets.QTreeView, ActionManager):
                                         [elt.capitalize() for elt in seq_factory.elements if
                                          not (elt == AddButtonPlaceholder.elt_name or
                                               elt == RootElt.elt_name)],
-                                       self.add_element))
+                                        self.add_element))
         self.menu.addSeparator()
         self.add_action('remove', 'Remove Element', menu=self.menu,
                         shortcut=Qt.Key.Key_Delete)

@@ -7,7 +7,9 @@ from pymodaq_gui import utils as gutils
 from pymodaq_gui.utils.shared_ui import MenuToolbarNames
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, ElementError
 from pymodaq_plugins_sequencer.utilities.sequencer.model_view import SequenceTreeView, SequenceTreeModel, \
-    SequenceWidgetDelegate, RootElt, AddButtonPlaceholder
+    SequenceWidgetDelegate
+from pymodaq_plugins_sequencer.utilities.elements.root import RootElt
+from pymodaq_plugins_sequencer.utilities.elements.button import AddButtonPlaceholder
 from pymodaq_utils.config import Config, GlobalConfig
 from pymodaq_utils.logger import set_logger, get_module_name
 

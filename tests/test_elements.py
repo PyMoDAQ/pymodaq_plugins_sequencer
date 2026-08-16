@@ -69,24 +69,21 @@ def test_all_element_serialized_registered(qtbot):
         assert seq_factory.get_seq_elt(elt_name) in ser_factory.get_serializables()
 
 
-@pytest.mark.parametrize('elt_name', seq_factory.elements)
-def test_widget_creation(qtbot, elt_name, mock_dashboard):
-    id = random.randint(0, 100)
-    element = seq_factory.get_seq_elt(elt_name)(id, dashboard=mock_dashboard)
-    widget = element.create_widget()
-    qtbot.addWidget(widget)
-    widget.show()
-
-
 class TestElements:
 
     @pytest.mark.parametrize('elt_name', seq_factory.elements)
-    def test_serialization_deserialization(self, qtbot, elt_name, mock_dashboard):
+    def test_widget_creation(self, qtbot, elt_name):
+        id = random.randint(0, 100)
+        element = seq_factory.get_seq_elt(elt_name)(id)
+        widget = element.create_widget()
+        qtbot.addWidget(widget)
+        widget.show()
+
+    @pytest.mark.parametrize('elt_name', seq_factory.elements)
+    def test_serialization_deserialization(self, qtbot, elt_name):
 
         id = random.randint(0, 100)
-        go_to = random.randint(0, 100)
-        element = seq_factory.get_seq_elt(elt_name)(id, dashboard=mock_dashboard,)
-        element.go_to = go_to
+        element = seq_factory.get_seq_elt(elt_name)(id, )
 
         assert ser_factory.get_apply_deserializer(
             ser_factory.get_apply_serializer(element), only_object=True) == element
@@ -96,48 +93,69 @@ class TestElements:
         assert obj == element
         assert remaining_bytes == b''
 
+    def test_tree_serialization_deserialization(self, qtbot):
 
-def test_get_elt_by_id_and_get_root():
+        tree_elt = create_tree()
 
-    root, _, _ = create_tree()
+        assert ser_factory.get_apply_deserializer(
+            ser_factory.get_apply_serializer(tree_elt), only_object=True) == tree_elt
 
-    elt_7_id = 7
-    elt_7 = root.get_elt_from_id(elt_7_id)
+        serialized = ser_factory.get_apply_serializer(tree_elt)
+        obj, remaining_bytes = ser_factory.get_apply_deserializer(serialized, False)
+        assert obj == tree_elt
+        assert remaining_bytes == b''
 
-    elt_4_id = 4
-    assert elt_7.id == elt_7_id
-    assert elt_7.get_root_elt() == root
+    @pytest.mark.parametrize('elt_name', seq_factory.elements)
+    def test_todict_fromdict(self, qtbot, elt_name, mock_dashboard):
 
-    elt_4 = elt_7.get_elt_from_id(elt_4_id)
-    assert elt_4.id == elt_4_id
-    assert elt_4.get_root_elt() == root
+        id = random.randint(0, 100)
+        element = seq_factory.get_seq_elt(elt_name)(id,)
 
-    assert elt_4.get_elt_from_id(-2) is None
+        dict_config = element.to_dict()
+        element_back = element.from_dict(dict_config)
+        assert element_back == element
 
+    def test_get_elt_by_id_and_get_root(self):
 
-def test_get_ids():
+        root, _, _ = create_tree()
 
-    root, all_ids, _ = create_tree()
-    ids = root.get_ids()
+        elt_7_id = 7
+        elt_7 = root.get_elt_from_id(elt_7_id)
 
-    for id in ids:
-        assert id in all_ids
-    for id in all_ids:
-        assert id in ids
+        elt_4_id = 4
+        assert elt_7.id == elt_7_id
+        assert elt_7.get_root_elt() == root
 
+        elt_4 = elt_7.get_elt_from_id(elt_4_id)
+        assert elt_4.id == elt_4_id
+        assert elt_4.get_root_elt() == root
 
-def test_get_elts():
-
-    root, all_ids, all_elts = create_tree()
-    elts = root.get_elts()
-
-    for _elt in elts:
-        assert _elt in all_elts
-    for _elt in all_elts:
-        assert _elt in elts
+        assert elt_4.get_elt_from_id(-2) is None
 
 
-def compare_get_ids_get_elts():
-    root, all_ids, all_elts = create_tree()
-    for (id, elt) in zip(all_ids, all_elts):
-        assert id == elt.id
+    def test_get_ids(self):
+
+        root, all_ids, _ = create_tree()
+        ids = root.get_ids()
+
+        for id in ids:
+            assert id in all_ids
+        for id in all_ids:
+            assert id in ids
+
+
+    def test_get_elts(self):
+
+        root, all_ids, all_elts = create_tree()
+        elts = root.get_elts()
+
+        for _elt in elts:
+            assert _elt in all_elts
+        for _elt in all_elts:
+            assert _elt in elts
+
+
+    def compare_get_ids_get_elts(self):
+        root, all_ids, all_elts = create_tree()
+        for (id, elt) in zip(all_ids, all_elts):
+            assert id == elt.id
