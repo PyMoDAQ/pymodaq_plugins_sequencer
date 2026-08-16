@@ -1,4 +1,6 @@
+from typing import Any
 import weakref
+
 
 from qtpy import QtCore
 from qt_themes import get_theme
@@ -112,35 +114,23 @@ class StateElt(SeqEltBase):
         self.state_manager.entry = self.state
         self.state_manager.execute_entry()
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
 
         to be reimplemented
         """
-        bytes = ser_factory.get_apply_serializer(self.state)
-        bytes += ser_factory.get_apply_serializer(self.state_manager.experiment_filename)
-        bytes += ser_factory.get_apply_serializer(self.states)
-        return bytes
+        return {'state': self.state,
+                'experiment': self.experiment,
+                'states': self.states,}
 
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
         """
-        state, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        experiment, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        states, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.experiment = experiment
-        self.states = states
-        self.state = state
-
-        return remaining_bytes
-
+        self.experiment = dict_config.pop('experiment')
+        self.states = dict_config.pop('states')
+        self.state = dict_config.pop('state')
 
     def _eq(self, other: 'StateElt'):
         """ Custom method to reimplement to assert two elements are equals"""

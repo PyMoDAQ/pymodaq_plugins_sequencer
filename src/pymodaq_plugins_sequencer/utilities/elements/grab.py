@@ -1,4 +1,6 @@
+from typing import Any
 import weakref
+
 from serializall import SerializableFactory
 
 from qtpy import QtCore
@@ -61,6 +63,7 @@ class GrabElt(SeqEltBase):
         self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
         self.modules_manager.selected_actuators_name = [act.title for act in self.dashboard.modules_manager.actuators_all]
         self.detectors = self.modules_manager.detectors_name
+        self.selected = self.detectors
         self.filter_selected_wrt_manager()
 
     def filter_selected_wrt_manager(self):
@@ -105,34 +108,21 @@ class GrabElt(SeqEltBase):
         # it is not necessary to hold the machine to save if using the Queue mechanism
         pass
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
 
         to be reimplemented
         """
-        detectors = self.detectors
-        selected = self.selected
+        return {'detectors': self.detectors,
+                'selected': self.selected}
 
-        bytes = ser_factory.get_apply_serializer(detectors)
-        bytes += ser_factory.get_apply_serializer(selected)
-        return bytes
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
         """
-        detectors, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        selected, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.detectors = detectors
-        self.selected = selected
-
-        return remaining_bytes
+        self.detectors = dict_config.pop('detectors')
+        self.selected = dict_config.pop('selected')
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""

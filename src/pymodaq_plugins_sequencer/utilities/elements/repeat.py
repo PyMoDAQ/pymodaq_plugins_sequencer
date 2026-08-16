@@ -1,4 +1,4 @@
-import weakref
+from typing import Any
 
 from serializall import SerializableFactory
 
@@ -60,26 +60,19 @@ class RepeatElt(SeqEltBase):
             self._ind_execute = 0
             self.done_signal.emit()
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
+    def to_dict_custom(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this element
 
         to be reimplemented
         """
-        return ser_factory.get_apply_serializer(self.n_repeat)
+        return {'n_repeat': self.n_repeat}
 
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
+    def from_dict_custom(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
         """
-        n_repeat, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        self.n_repeat = n_repeat
-        return remaining_bytes
+        self.n_repeat = dict_config.pop('n_repeat')
 
     def _eq(self, other: 'RepeatElt'):
         """ Custom method to reimplement to assert two elements are equals"""

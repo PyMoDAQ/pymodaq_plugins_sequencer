@@ -1,11 +1,11 @@
-import inspect
+
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from pymodaq.control_modules.daq_move import DAQ_Move
-from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+from serializall import SerializableFactory
+
 from pymodaq.utils.managers.modules import ModulesManager
 from pymodaq_data import DataToExport
 from pymodaq_gui.managers.parameter_manager import ParameterManager
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from pymodaq_plugins_sequencer.utilities.elements.choice import ChoiceElt
 
 logger = set_logger(get_module_name(__file__))
-
+ser_factory = SerializableFactory()
 
 class ChoiceModelBase(ParameterManager):
     params = []
@@ -32,6 +32,9 @@ class ChoiceModelBase(ParameterManager):
                          )
         self.parent_elt = parent_elt
         self.modules_manager: ModulesManager = parent_elt.modules_manager
+
+    def __eq__(self, other: 'ChoiceModelBase') -> bool:
+        return self.to_dict() == other.to_dict()
 
     def updated_module_manager(self):
         """ called whenever the parent modules manager is updated
@@ -55,6 +58,22 @@ class ChoiceModelBase(ParameterManager):
         Should raise ElementError if not valid
         """
         return None
+
+    def to_dict(self) -> dict[str, Any]:
+        """ adds attribute to a dict in order to produce a human readable
+        representation/configuration for this model params
+
+        to be reimplemented
+        """
+        return {}
+
+    def from_dict(self, dict_config: dict[str, Any]):
+        """ Create/set the custom part of the element to finish initialization
+        using setters, attribute assignment or methods
+
+        to be reimplemented
+        """
+        pass
 
 
 def get_choice_models():
