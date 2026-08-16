@@ -17,7 +17,7 @@ dependencies = [
     "pymodaq_gui>=5.2.0",
     "pymodaq_data>=5.2.0",
     "serializall",
-    "pyyaml",
+    "ruamel.yaml",
     #todo: list here all dependencies your package may have
 ]
 

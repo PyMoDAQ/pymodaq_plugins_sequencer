@@ -36,25 +36,6 @@ class AddButtonPlaceholder(SeqEltBase):
     def _execute(self, dte: DataToExport = None):
         self.done_signal.emit()
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        return b''
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        return bytes_str
-
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this element

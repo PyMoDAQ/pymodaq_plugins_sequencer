@@ -114,35 +114,6 @@ class StateElt(SeqEltBase):
         self.state_manager.entry = self.state
         self.state_manager.execute_entry()
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        bytes = ser_factory.get_apply_serializer(self.state)
-        bytes += ser_factory.get_apply_serializer(self.state_manager.experiment_filename)
-        bytes += ser_factory.get_apply_serializer(self.states)
-        return bytes
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        state, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        experiment, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        states, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        self.experiment = experiment
-        self.states = states
-        self.state = state
-
-        return remaining_bytes
-
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this element

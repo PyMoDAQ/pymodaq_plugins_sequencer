@@ -314,12 +314,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         bytes: the bytes string
         """
         bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer((obj.elt_name,
-                                                          obj._id,
-                                                          obj.children_allowed))
-        bytes_string += obj.serialize_custom()
-        if obj.children_allowed:
-            bytes_string += ser_factory.get_apply_serializer(obj.children)
+        bytes_string += ser_factory.get_apply_serializer(obj.to_dict())
         return bytes_string
 
     @classmethod
@@ -331,15 +326,8 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         SeqEltBase: the decoded object
         bytes: the remaining bytes string if any
         """
-        (elt_name, id, children_allowed) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
-        seq_elt.children_allowed = children_allowed
-
-        remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
-        if seq_elt.children_allowed:
-            children, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-            for child in children:
-                seq_elt.append_child(child)
+        dict_config, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        seq_elt = cls.from_dict(dict_config)
 
         return seq_elt, remaining_bytes
 
@@ -410,25 +398,6 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         """ Execute the Element
 
         Should emit the done_signal when executed (could be with empty DataToExport)
-        """
-        raise NotImplementedError
-
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        raise NotImplementedError
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
         """
         raise NotImplementedError
 

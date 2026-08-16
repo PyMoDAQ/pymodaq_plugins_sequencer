@@ -23,6 +23,7 @@ main_config = GlobalConfig()
 EXTENSION_NAME = 'Sequencer'
 CLASS_NAME = 'Sequencer'
 
+
 class Sequencer(CustomExt):
 
     params = []

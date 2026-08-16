@@ -76,54 +76,11 @@ class ThresholdChoiceModel(ChoiceModelBase):
         if self.settings['data_name'] is None or self.settings['data_name'] == '':
             raise ElementError(f'Element {self.parent_elt} has no data name set')
 
-    def serialize(self) -> bytes:
-        """Convert into a bytes string
-
-        Returns
-        -------
-        bytes: the bytes string
-        """
-        return ser_factory.get_apply_serializer(
-            (self.settings['detectors'],
-             self.settings.child('threshold').opts['limits'],
-             self.settings['threshold'],
-             self.settings.child('direction').opts['limits'],
-             self.settings['direction'],
-             self.settings['data_name'])
-        )
-
-    def deserialize(self, bytes_str: bytes) -> bytes:
-        """Convert bytes into a attributes to apply to self
-
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        (detectors,
-         thresholds,
-         threshold,
-         directions,
-         direction,
-         data_names,
-         data_name), remaining_bytes = \
-            ser_factory.get_apply_deserializer(bytes_str)
-        self.settings['detectors'] = detectors
-        self.settings.child('threshold').setLimits(thresholds)
-        self.settings['threshold'] = threshold
-        self.settings.child('direction').setLimits(directions)
-        self.settings['direction'] = direction
-        self.settings.child('data_name').setLimits(data_names)
-        self.settings['data_name'] = data_name
-
-        return remaining_bytes
-
     def to_dict(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this model params
         """
         return {'detectors': self.settings['detectors'],
-                'thresholds': self.settings.child('threshold').opts['limits'],
                 'threshold': self.settings['threshold'],
                 'directions': self.settings.child('direction').opts['limits'],
                 'direction': self.settings['direction'],
@@ -136,7 +93,6 @@ class ThresholdChoiceModel(ChoiceModelBase):
         using setters, attribute assignment or methods
         """
         self.settings['detectors'] = dict_config.pop('detectors')
-        self.settings.child('threshold').setLimits(dict_config.pop('thresholds'))
         self.settings['threshold'] = dict_config.pop('threshold')
         self.settings.child('direction').setLimits(dict_config.pop('directions'))
         self.settings['direction'] = dict_config.pop('direction')

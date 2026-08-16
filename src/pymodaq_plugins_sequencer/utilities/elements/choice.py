@@ -174,41 +174,6 @@ class ChoiceElt(SeqEltBase):
         param.tree.setParameters(self.choice_model.settings, showTop=False)
         param.tree.setMinimumHeight(len(self.choice_model.settings.children()) * 50)
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        bytes_to_ser = ser_factory.get_apply_serializer(self.go_to_true)
-        bytes_to_ser += ser_factory.get_apply_serializer(self.go_to_false)
-        bytes_to_ser += ser_factory.get_apply_serializer(self.choice_model.model_name)
-        bytes_to_ser += self.choice_model.serialize()
-
-        return bytes_to_ser
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        go_true, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        go_false, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        model_name, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        pwp, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-
-        self.go_to_false = go_false
-        self.go_to_true = go_true
-        self.choice_model = model_name
-        remaining_bytes = self.choice_model.deserialize(remaining_bytes)
-        self.recursive_apply_value(self.choice_model.settings,
-                                   pwp.parameter)
-        return remaining_bytes
-
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this element

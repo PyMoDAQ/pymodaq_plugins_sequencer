@@ -58,29 +58,6 @@ class WaitElt(SeqEltBase):
     def done(self):
         self.done_signal.emit()
 
-    def serialize_custom(self) -> bytes:
-        """Serialize the custom part of the element
-
-        to be reimplemented
-        """
-        return ser_factory.get_apply_serializer(self.wait_time)
-
-
-
-    def deserialize_custom(self, bytes_str: bytes) -> bytes:
-        """Deserialize the custom part of the element to finish initialization using setters, attribute assignment
-        or methods
-
-        to be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        wait_time, remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
-        self.wait_time = wait_time
-        return remaining_bytes
-
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this element

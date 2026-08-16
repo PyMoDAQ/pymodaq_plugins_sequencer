@@ -59,29 +59,6 @@ class ChoiceModelBase(ParameterManager):
         """
         return None
 
-    def serialize(self) -> bytes:
-        """Convert into a bytes string
-
-        To be reimplemented
-
-        Returns
-        -------
-        bytes: the bytes string
-        """
-        return b''
-
-    @classmethod
-    def deserialize(cls, bytes_str: bytes) -> bytes:
-        """Convert bytes into a attributes to apply to self
-
-        To be reimplemented
-
-        Returns
-        -------
-        bytes: the remaining bytes string if any
-        """
-        return bytes_str
-
     def to_dict(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
         representation/configuration for this model params
