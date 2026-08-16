@@ -1,6 +1,7 @@
 import weakref
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 import numpy as np
+from PySide6.QtStateMachine import QSignalTransition
 
 from qtpy import QtWidgets, QtCore
 
@@ -28,8 +29,8 @@ class SequenceElt(SeqEltBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        self._sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
+        self._sequence: str = None
+        self.sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
 
         self._combo: weakref.ref[ComboBox] | None = None  # weakref to the combobox holding the states
 
@@ -50,7 +51,17 @@ class SequenceElt(SeqEltBase):
 
         Do whatever is needed to instantiate your element with the Dashboard
         """
-        self._sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
+        self.sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
+
+    @property
+    def sequence_obj(self) -> Union['Sequence', None]:
+        match =  find_objects_in_list_from_attr_name_val(
+            self.get_sequences(),
+            'title',
+            self.sequence)
+        if len(match) > 0:
+            return match[0]
+        return None
 
     @property
     def sequence(self) -> str:
@@ -59,6 +70,8 @@ class SequenceElt(SeqEltBase):
     @sequence.setter
     def sequence(self, value: str):
         self._sequence = value
+        self.mstate.add_external_transition(self.sequence_obj.machine.finished,
+                                            self.mstate.done_state)
 
     def update_combo_sequences(self):
         if self._combo is not None and self._combo() is not None:
@@ -83,8 +96,7 @@ class SequenceElt(SeqEltBase):
         return base_widget
 
     def _execute(self, dte: DataToExport = None):
-        # to do connect to other Sequence State Machine...
-        pass
+        self.sequence_obj.start_sequence()
 
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable

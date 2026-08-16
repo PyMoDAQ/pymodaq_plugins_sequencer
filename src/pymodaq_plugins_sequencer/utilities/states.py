@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 from qtpy import QtCore
 
 from qtpy.QtStateMachine import (QState, QStateMachine, QFinalState, QHistoryState,
@@ -25,6 +25,12 @@ class MyState(QState):
 
 
 class MyQFinalState(QFinalState):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.incoming_transition: TrackedTransition | None = None  # This will hold the transition object
+        self.source_state: MyState | CompositeState | None = None
+
     def onEntry(self, event, /):
         logger.debug(f'Entering  {self.objectName()}')
 
@@ -36,9 +42,9 @@ class CompositeState(MyState):
     def __init__(self, elt: 'SeqEltBase', *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.execute_state: QState | None = None
+        self.execute_state: MyState | None = None
         self.done_state: MyQFinalState | None = None
-        self.children_state: QState | None = None
+        self.children_state: MyState | None = None
         self._external_transitions = []
 
         self._elt = elt
@@ -65,16 +71,16 @@ class CompositeState(MyState):
     def setup_states(self):
         self.setObjectName(f'State of the elt: {self._elt}')
 
-        self.execute_state = QState(self)
+        self.execute_state = MyState(self)
         self.execute_state.setObjectName(f'ExecuteState of the elt: {self._elt}')
         self.done_state = MyQFinalState(self)
         self.done_state.setObjectName(f'FinalState of the elt: {self._elt}')
-        self.children_state = QState(self)
+        self.children_state = MyState(self)
         self.children_state.setObjectName(f'ChildrenState of the elt: {self._elt}')
         self.setInitialState(self.execute_state)
 
     def add_external_transition(self, signal: QtCore.Signal,
-                                target: 'CompositeState'):
+                                target: Union['CompositeState', MyState, MyQFinalState]):
         self._external_transitions.append(
             self.addTransition(TrackedTransition(signal, self, target)))
 

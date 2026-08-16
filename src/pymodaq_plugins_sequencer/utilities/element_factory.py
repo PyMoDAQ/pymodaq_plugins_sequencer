@@ -256,7 +256,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     def parent_sequence(self, value: 'Sequence'):
         """ """
         self._parent_sequence = value
-        self.do_things_with_parent_seqeunce()
+        self.do_things_with_parent_sequence()
 
     def set_parent_sequence(self, parent_sequence: 'Sequence'):
         self.parent_sequence = parent_sequence
