@@ -122,12 +122,10 @@ class Sequence(CustomExt):
     def connect_things(self):
         """Connect actions and/or other widgets signal to methods"""
         self.connect_action('start', self.start_sequence)
-        self.connect_action('stop', self.stop_sequence)
-
         self.interrupt_state.entered.connect(self.pause_sequence)
 
         self.root_elt.mstate.addTransition(self.get_action('stop').triggered, self.done_state)
-        self.done_state.exited.connect(self.stop_sequence)
+        self.machine.finished.connect(self.sequence_stopped)
 
     def value_changed(self, param):
         """ Actions to perform when one of the param's value in self.settings is changed from the
@@ -174,6 +172,7 @@ class Sequence(CustomExt):
                                 True,
                                 child.mstate,
                                 self.interrupt_state, ))
+            child.mstate.addTransition(self.get_action('stop').triggered, self.done_state)
             if ind_child == 0:
                 elt.mstate.children_state.setInitialState(child.mstate)
             if ind_child == len(elt.children_without_add) - 1:
@@ -202,11 +201,9 @@ class Sequence(CustomExt):
             self.label.setText('Some elements are not valid, check the log')
             return
 
-        self.machine.finished.connect(self.stop_sequence)
         self.machine.start()
 
-    def stop_sequence(self):
-        self.machine.stop()
+    def sequence_stopped(self):
         self.label.setText('Machine finished')
 
     def pause_sequence(self):
