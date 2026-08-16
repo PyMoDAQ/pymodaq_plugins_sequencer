@@ -26,6 +26,7 @@ logger = set_logger(get_module_name(__file__))
 
 if TYPE_CHECKING:
     from pymodaq.dashboard import Dashboard
+    from pymodaq_plugins_sequencer.utilities.sequencer.sequence import Sequence
 
 ser_factory = SerializableFactory()
 
@@ -74,6 +75,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def __init__(self, id: int,
                  parent: 'SeqEltBase'= None,
+                 parent_app: 'Sequence' = None,
                  **label_kwargs):
         QtCore.QObject.__init__(self)
         ActionManager.__init__(self)
@@ -82,6 +84,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
         self._id = id
         self._dashboard: 'DashBoard' = None
+        self._parent_app = parent_app
         self._parent: 'SeqEltBase' = parent
 
         self._children = []
@@ -243,7 +246,20 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self.do_things_with_dashboard()
 
     def set_dashboard(self, dashboard: 'DashBoard'):
-        self.dashboard = dashboard
+        self.dashboard = dashboard    @property
+
+    @property
+    def parent_app(self) -> 'Sequence':
+        return self._parent_app
+
+    @parent_app.setter
+    def parent_app(self, value: 'Sequence'):
+        """ """
+        self._parent_app = value
+        self.do_things_with_parent_app()
+
+    def set_parent_app(self, parent_app: 'Sequence'):
+        self.parent_app = parent_app
 
     def __eq__(self, other: 'SeqEltBase'):
         if not isinstance(other, self.__class__):
@@ -422,6 +438,13 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         raise NotImplementedError
 
     def do_things_with_dashboard(self):
+        """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
+
+        Do whatever is needed to instantiate your element with the Dashboard
+        """
+        pass
+
+    def do_things_with_parent_app(self):
         """ If this Element is using the Dashboard, once its setter has been called, this method will be executed
 
         Do whatever is needed to instantiate your element with the Dashboard

@@ -12,9 +12,9 @@ class RootElt(SeqEltBase):
     elt_name = 'root'
     children_allowed = True
 
-    def __init__(self, id: int = -1, parent=None):  # should keep the signature of the base
+    def __init__(self, id: int = -1, parent=None, **kwargs):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
-        super().__init__(id=-1, parent=parent)
+        super().__init__(id=id, parent=parent, **kwargs)
         self._ind_execute: int = 0
 
     def _eq(self, other: 'SeqEltBase'):
