@@ -19,7 +19,6 @@ from pymodaq_gui.utils.widgets.combo import ComboBox
 from pymodaq_plugins_sequencer.utilities.choice_models.model import ChoiceModelBase
 from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
-from pymodaq_plugins_sequencer.utilities.elements.grab import GrabElt
 from pymodaq_plugins_sequencer.utilities.elements.button import AddButtonPlaceholder
 from pymodaq_plugins_sequencer.utilities.states import ValueTransition
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
@@ -183,7 +182,7 @@ class ChoiceElt(SeqEltBase):
         bytes_to_ser = ser_factory.get_apply_serializer(self.go_to_true)
         bytes_to_ser += ser_factory.get_apply_serializer(self.go_to_false)
         bytes_to_ser += ser_factory.get_apply_serializer(self.choice_model.model_name)
-        bytes_to_ser += ser_factory.get_apply_serializer(ParameterWithPath(self.choice_model.settings))
+        bytes_to_ser += self.choice_model.serialize()
 
         return bytes_to_ser
 
@@ -201,10 +200,11 @@ class ChoiceElt(SeqEltBase):
         go_false, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         model_name, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
         pwp, remaining_bytes = ser_factory.get_apply_deserializer(remaining_bytes, False)
-        pwp: ParameterWithPath
+
         self.go_to_false = go_false
         self.go_to_true = go_true
         self.choice_model = model_name
+        remaining_bytes = self.choice_model.deserialize(remaining_bytes)
         self.recursive_apply_value(self.choice_model.settings,
                                    pwp.parameter)
         return remaining_bytes
@@ -218,32 +218,27 @@ class ChoiceElt(SeqEltBase):
         dict_config =  {'go_to_true': self.go_to_true,
                         'go_to_false': self.go_to_false,
                         'choice_model': self.choice_model.model_name}
-        self.choice_model.to_dict(dict_config)
+        dict_config.update(self.choice_model.to_dict())
         return dict_config
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
-        self.detectors = dict_config.pop('detectors')
-        self.selected = dict_config.pop('selected')
-
-    def recursive_apply_value(self, param1: Parameter, param2: Parameter):
-        if param1.value() is not None and param2.value() is not None:
-            if 'limits' in param1.opts:
-                param1.setLimits(param2.opts['limits'])
-            param1.setValue(param2.value())
-        for ind_child in range(len(param1.children())):
-            self.recursive_apply_value(param1.children()[ind_child],
-                                       param2.children()[ind_child],)
+        self.go_to_true = dict_config.pop('go_to_true')
+        self.go_to_false = dict_config.pop('go_to_false')
+        self.choice_model = dict_config.pop('choice_model')
+        self.choice_model.from_dict(dict_config)
 
     def _eq(self, other: 'ChoiceElt') -> bool:
         """ Custom method to reimplement to assert two elements are equals"""
         if not (hasattr(other, 'go_to_true') or hasattr(other, 'go_to_false')):
             return False
-        return (self.go_to_false == other.go_to_false and
+        if not (self.go_to_false == other.go_to_false and
                 self.go_to_true == other.go_to_true and
-                self.choice_model.model_name == other.choice_model.model_name)
+                self.choice_model.model_name == other.choice_model.model_name):
+            return False
+        return self.choice_model.__eq__(other.choice_model)
 
     def __repr__(self):
         return f'{super().__repr__()} - Model: {self.choice_model.model_name} - True: {self.go_to_true} - False: {self.go_to_false}'

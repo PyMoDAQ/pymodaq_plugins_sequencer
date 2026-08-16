@@ -5,9 +5,11 @@ from serializall import SerializableFactory
 from pymodaq_data import DataToExport
 from pymodaq_gui.utils.menu_utils import MenuButton
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory, SeqEltBase
-from pymodaq_plugins_sequencer.utilities.sequencer.model_view import seq_factory
+
 from pymodaq_plugins_sequencer.utilities.elements.root import RootElt
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
+
+seq_factory = SeqEltFactory()
 
 
 @SerializableFactory.register_decorator()

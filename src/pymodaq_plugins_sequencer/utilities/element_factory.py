@@ -251,6 +251,10 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         for attr in ('id', 'name',):
             if getattr(self, attr) != getattr(other, attr):
                 return False
+        if self.children_allowed:
+            for child, child_other in zip(self.children, other.children):
+                if not child.__eq__(child_other):
+                    return False
         return self._eq(other)
 
     @property
@@ -310,7 +314,9 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         bytes: the bytes string
         """
         bytes_string = b''
-        bytes_string += ser_factory.get_apply_serializer((obj.elt_name, obj._id))
+        bytes_string += ser_factory.get_apply_serializer((obj.elt_name,
+                                                          obj._id,
+                                                          obj.children_allowed))
         bytes_string += obj.serialize_custom()
         if obj.children_allowed:
             bytes_string += ser_factory.get_apply_serializer(obj.children)
@@ -325,8 +331,9 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         SeqEltBase: the decoded object
         bytes: the remaining bytes string if any
         """
-        (elt_name, id) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
+        (elt_name, id, children_allowed) , remaining_bytes = ser_factory.get_apply_deserializer(bytes_str, False)
         seq_elt = SeqEltFactory().get_seq_elt(elt_name)(id)
+        seq_elt.children_allowed = children_allowed
 
         remaining_bytes = seq_elt.deserialize_custom(remaining_bytes)
         if seq_elt.children_allowed:

@@ -1,16 +1,24 @@
 import random
+from typing import TYPE_CHECKING
 
 import pytest
 from qt_themes import set_theme
 
 from serializall import SerializableFactory
 
+from pymodaq_plugins_sequencer import get_choice_models
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltFactory, SeqEltBase
 from pymodaq_plugins_sequencer.utilities.mocks import DAQ_Move, DAQ_Viewer, DashBoard
+from pymodaq_plugins_sequencer.utilities.choice_models.factory import ChoiceModelFactory
+
+if TYPE_CHECKING:
+    from pymodaq_plugins_sequencer.utilities.elements.choice import ChoiceElt
 
 
+get_choice_models()
 seq_factory = SeqEltFactory()
 ser_factory = SerializableFactory()
+choice_factory = ChoiceModelFactory()
 
 ROOT_INDEX = -1
 
@@ -21,7 +29,7 @@ def qtbot(qtbot):
     return qtbot
 
 
-def create_tree() -> tuple[SeqEltBase, list[int], list[SeqEltBase]]:
+def create_tree(n_element=5) -> tuple[SeqEltBase, list[int], list[SeqEltBase]]:
     """create a tree of SeqEltBase with two levels depth
 
     First layer has 5 children with index from 0 to 5
@@ -32,7 +40,7 @@ def create_tree() -> tuple[SeqEltBase, list[int], list[SeqEltBase]]:
     ind = 0
     ids = []
     elts = []
-    for _ in range(0, 5):
+    for _ in range(0, n_element):
         ind += 1
         child = SeqEltFactory.get_seq_elt('wait')(ind)
         ids.append(child.id)
@@ -40,7 +48,7 @@ def create_tree() -> tuple[SeqEltBase, list[int], list[SeqEltBase]]:
         child.children_allowed = True
         elt.append_child(child)
 
-        for _ in range(0, 5):
+        for _ in range(0, n_element):
             ind += 1
             grandchild = SeqEltFactory.get_seq_elt('wait')(ind)
             ids.append(grandchild.id)
@@ -95,7 +103,7 @@ class TestElements:
 
     def test_tree_serialization_deserialization(self, qtbot):
 
-        tree_elt = create_tree()
+        tree_elt, ids, elts = create_tree(5)
 
         assert ser_factory.get_apply_deserializer(
             ser_factory.get_apply_serializer(tree_elt), only_object=True) == tree_elt
@@ -114,6 +122,13 @@ class TestElements:
         dict_config = element.to_dict()
         element_back = element.from_dict(dict_config)
         assert element_back == element
+
+    def test_tree_todict_fromdict(self, qtbot):
+
+        tree_elt, ids, elts = create_tree(5)
+
+        assert tree_elt.from_dict(tree_elt.to_dict()) == tree_elt
+
 
     def test_get_elt_by_id_and_get_root(self):
 
@@ -159,3 +174,25 @@ class TestElements:
         root, all_ids, all_elts = create_tree()
         for (id, elt) in zip(all_ids, all_elts):
             assert id == elt.id
+
+
+class TestChoiceElementModels():
+
+    @pytest.mark.parametrize('choice_model', choice_factory.models)
+    def test_models(self, qtbot, choice_model):
+
+        elt: ChoiceElt = seq_factory.get_seq_elt('choice')(0)
+        elt.choice_model = choice_model
+
+    @pytest.mark.parametrize('choice_model', choice_factory.models)
+    def test_from_to_dict(self, qtbot, choice_model):
+
+        elt: ChoiceElt = seq_factory.get_seq_elt('choice')(0)
+        elt.choice_model = choice_model
+
+
+        assert ser_factory.get_apply_deserializer(
+            ser_factory.get_apply_serializer(elt), only_object=True) == elt
+
+
+        assert elt.from_dict(elt.to_dict()) == elt
