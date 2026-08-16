@@ -10,6 +10,8 @@ from qt_themes import get_theme
 
 from serializall import SerializableFactory
 
+import yaml
+
 from pymodaq_gui.managers.action_manager import ActionManager
 from pymodaq_gui.utils import select_file
 from pymodaq_gui.utils.menu_utils import MenuButton, IterableMenu
@@ -20,6 +22,8 @@ from ..elements.button import AddButtonPlaceholder
 from ..elements.root import RootElt
 from ..styling import button_style, menu_style, color_from_depth
 from ...utils import get_set_sequencer_path
+from ..yaml_utils import PrettyListDumper
+
 
 if TYPE_CHECKING:
     from pymodaq.scripting import Dashboard
@@ -328,13 +332,20 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
         return new_id
 
     def save_elements(self, file_path: Path) -> None:
-        with open(file_path, 'wb') as f:
-            f.write(ser_factory.get_apply_serializer(self.root_elt))
+        with open(file_path, 'w') as file:
+            yaml.dump(
+                self.root_elt.to_dict(),
+                file,
+                Dumper=PrettyListDumper,
+                default_flow_style=False,
+                sort_keys=False,
+                allow_unicode=True
+            )
 
     def load_elements(self, file_path: Path) -> None:
         self.clear(clear_add=True)
-        with open(file_path, 'rb') as file:
-            root_elt: SeqEltBase = ser_factory.get_apply_deserializer(file.read())
+        with open(file_path, 'r') as file:
+            root_elt: SeqEltBase = SeqEltBase.from_dict(yaml.safe_load(file))
         self.recursive_insert(None, root_elt, 0)
 
     def recursive_insert(self, parent_index: QModelIndex | None,
