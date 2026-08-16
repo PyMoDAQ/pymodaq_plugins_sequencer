@@ -1,5 +1,6 @@
 from pymodaq_plugins_sequencer.utilities.states import (
-    QStateMachine, MyQFinalState, QHistoryState, QState, QAbstractTransition)
+    QStateMachine, MyQFinalState, QHistoryState, QState, QAbstractTransition, TrackedTransition, InterruptState,
+    ValueTransition)
 
 from qtpy import QtWidgets, QtCore
 
@@ -36,7 +37,7 @@ class Sequencer(CustomExt):
 
         self.machine = QStateMachine()
         self.done_state = MyQFinalState()
-        self.history_state = QHistoryState()
+        self.interrupt_state = InterruptState()
 
         self.setup_ui()
         self.setup_machine()
@@ -121,10 +122,10 @@ class Sequencer(CustomExt):
         """Connect actions and/or other widgets signal to methods"""
         self.connect_action('start', self.start_sequence)
         self.connect_action('stop', self.stop_sequence)
-        self.connect_action('pause', self.pause_sequence)
+
+        self.interrupt_state.entered.connect(self.pause_sequence)
 
         self.root_elt.mstate.addTransition(self.get_action('stop').triggered, self.done_state)
-        self.root_elt.mstate.addTransition(self.get_action('pause').triggered, self.history_state)
         self.done_state.exited.connect(self.stop_sequence)
 
     def value_changed(self, param):
@@ -156,7 +157,7 @@ class Sequencer(CustomExt):
 
         self.machine.addState(self.root_elt.mstate)
         self.machine.addState(self.done_state)
-        self.machine.addState(self.history_state)
+        self.machine.addState(self.interrupt_state)
         self.machine.setInitialState(self.root_elt.mstate)
         self.root_elt.mstate.addTransition(self.root_elt.mstate.finished, self.done_state)
 
@@ -167,6 +168,11 @@ class Sequencer(CustomExt):
         for ind_child, child in enumerate(elt.children_without_add):
             child.mstate.clear_state_and_transitions()
             child.mstate.setParent(elt.mstate.children_state)
+            child.mstate.addTransition(
+                ValueTransition(self.get_action('pause').triggered,
+                                True,
+                                child.mstate,
+                                self.interrupt_state, ))
             if ind_child == 0:
                 elt.mstate.children_state.setInitialState(child.mstate)
             if ind_child == len(elt.children_without_add) - 1:
@@ -203,7 +209,17 @@ class Sequencer(CustomExt):
         self.label.setText('Machine finished')
 
     def pause_sequence(self):
-        pass
+        # clear previsously set transition
+        for transition in self.interrupt_state.transitions():
+            self.interrupt_state.removeTransition(transition)
+
+        # add a transition to the composite state the machine was in
+        # before the user pressed the pause button (restart the composite state entirely...)!
+        self.interrupt_state.addTransition(ValueTransition(
+            self.get_action('pause').triggered,
+            False,
+            self.interrupt_state,
+            self.interrupt_state.source_state))
 
 
 def main():
