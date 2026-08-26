@@ -18,9 +18,9 @@ class AddButtonPlaceholder(SeqEltBase):
     elt_name = 'button'
     children_allowed = False
 
-    def __init__(self, id: int = -2, parent=None):  # should keep the signature of the base
+    def __init__(self, id: int = -2, parent=None, **kwargs):  # should keep the signature of the base
         # Pass a specific string or ID to distinguish it from standard data
-        super().__init__(id=-2, parent=parent)
+        super().__init__(id=id, parent=parent, **kwargs)
 
     def create_widget(self, parent=None) -> QtWidgets.QWidget:
         return MenuButton('Add Element',
