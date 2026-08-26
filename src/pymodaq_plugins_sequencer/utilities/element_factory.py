@@ -5,7 +5,7 @@ from typing import Tuple, Callable, TYPE_CHECKING, Any, Union, Iterable, Mapping
 
 from qtpy import QtCore, QtWidgets
 
-from pymodaq_plugins_sequencer.utilities.states import CompositeState, QAbstractTransition, QState
+from pymodaq_plugins_sequencer.utilities.states import CompositeState, QState
 
 from qt_themes import get_theme
 

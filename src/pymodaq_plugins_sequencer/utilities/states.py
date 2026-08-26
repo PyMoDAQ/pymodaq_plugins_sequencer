@@ -1,9 +1,6 @@
 from typing import TYPE_CHECKING, Any, Union
+import qtpy
 from qtpy import QtCore
-
-from qtpy.QtStateMachine import (QState, QStateMachine, QFinalState, QHistoryState,
-                                 QAbstractTransition, QSignalTransition)  # noqa
-
 
 from pymodaq_utils.logger import set_logger, get_module_name
 
@@ -13,16 +10,31 @@ if TYPE_CHECKING:
 
 logger = set_logger(get_module_name(__file__))
 
-from PySide6.QtStateMachine import QStateMachine, QState
+if qtpy.PYQT6:
+    from PyQt6.QtStateMachine import QStateMachine, QState, QFinalState, QSignalTransition, QAbstractTransition, QHistoryState
+elif qtpy.PYSIDE6:
+    from qtpy.QtStateMachine import QStateMachine, QState, QFinalState, QSignalTransition, QAbstractTransition, QHistoryState
+elif qtpy.PYQT5:
+    from PyQt5.QtCore import QStateMachine, QState, QFinalState, QSignalTransition, QAbstractTransition, QHistoryState
 
 
 class MyState(QState):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, name: str = None):
         super().__init__(parent)
+
+        if name is not None:
+            self.setObjectName(name)
 
         self.incoming_transition: TrackedTransition | None = None  # This will hold the transition object
         self.source_state: MyState | CompositeState | None = None
 
+    def onEntry(self, event, /):
+        logger.debug(f'Entering {self.objectName()}')
+        super().onEntry(event, )
+
+    def onExit(self, event, /):
+        logger.debug(f'Exiting {self.objectName()}')
+        super().onExit(event, )
 
 class MyQFinalState(QFinalState):
     def __init__(self, parent=None):
@@ -60,13 +72,7 @@ class CompositeState(MyState):
         if value and hasattr(self._elt, 'initialize_element'):
             self._elt.initialize_element()
 
-    def onEntry(self, event, /):
-        logger.debug(f'Entering {self.objectName()}')
-        super().onEntry(event, )
 
-    def onExit(self, event, /):
-        logger.debug(f'Exiting {self.objectName()}')
-        super().onExit(event, )
 
     def setup_states(self):
         self.setObjectName(f'State of the elt: {self._elt}')

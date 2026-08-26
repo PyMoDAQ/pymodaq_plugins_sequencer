@@ -6,7 +6,7 @@ from serializall import SerializableFactory
 from qtpy import QtCore
 
 from pymodaq_utils.logger import set_logger, get_module_name
-from pymodaq.utils.managers.modules import ModuleType
+
 from pymodaq_data import DataToExport
 from pymodaq_gui.parameter.pymodaq_ptypes.itemselect import ItemSelect
 from pymodaq_gui.utils.widgets import SpinBox
