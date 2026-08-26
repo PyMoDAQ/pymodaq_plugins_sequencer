@@ -168,9 +168,11 @@ class ChoiceElt(SeqEltBase):
         combo.currentTextChanged.connect(lambda: self.update_params(parameter_tree))
         base_widget.insert_widget(parameter_tree.widget, 2)
         base_widget.tree = parameter_tree
+        parameter_tree.widget.setVisible(len(self.choice_model.params) != 0)
         return base_widget
 
     def update_params(self, param: ParameterTreeWidget):
+        param.widget.setVisible(len(self.choice_model.params) != 0)
         param.tree.setParameters(self.choice_model.settings, showTop=False)
         param.tree.setMinimumHeight(len(self.choice_model.settings.children()) * 50)
 
