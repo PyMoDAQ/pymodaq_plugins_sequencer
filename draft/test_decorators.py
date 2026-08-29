@@ -10,6 +10,11 @@ class SequencerObjectManager:
 sequencer_object_manager = SequencerObjectManager()
 
 
+def expose(method):
+    method._exposed = True
+    return method
+
+
 def expose_to_sequencer(manager):
 
     def decorator(cls):
@@ -37,11 +42,6 @@ def expose_to_sequencer(manager):
         return cls
 
     return decorator
-
-
-def expose(method):
-    method._exposed = True
-    return method
 
 
 # class written for the sequencer
@@ -104,7 +104,7 @@ class ExposedClassC:
 
     @property
     def method_b(self):
-        return "something"    @expose
+        return "something"
 
     def method_c(self):
         pass
