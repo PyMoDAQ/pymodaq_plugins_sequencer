@@ -1,3 +1,5 @@
+### decorator code
+
 class SequencerObjectManager:
 
     def __init__(self):
@@ -43,6 +45,8 @@ def expose_to_sequencer(manager):
 
     return decorator
 
+
+### examples and testing
 
 # class written for the sequencer
 @expose_to_sequencer(sequencer_object_manager)
