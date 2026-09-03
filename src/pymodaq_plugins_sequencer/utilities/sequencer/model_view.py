@@ -353,10 +353,13 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
                 allow_unicode=True
             )
 
-    def load_elements(self, file_path: Path) -> None:
+    def load_elements(self, file_path: Path | dict | str) -> None:
         self.clear(clear_add=True)
-        with open(file_path, 'r') as file:
-            root_elt: SeqEltBase = SeqEltBase.from_dict(yaml.safe_load(file))
+        if isinstance(file_path, Path | str):
+            with open(file_path, 'r') as file:
+                root_elt: SeqEltBase = SeqEltBase.from_dict(yaml.safe_load(file))
+        else:
+            root_elt: SeqEltBase = SeqEltBase.from_dict(file_path)
         self.recursive_insert(None, root_elt, 0)
 
     def recursive_insert(self, parent_index: QModelIndex | None,

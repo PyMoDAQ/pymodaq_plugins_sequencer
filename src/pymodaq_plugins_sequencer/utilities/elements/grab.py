@@ -194,7 +194,7 @@ class GrabElt(SeqEltBase):
         """
         return {'detectors': self.detectors,
                 'selected': self.selected,
-                'status': self.status,}
+                'status': self.status.value,}
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
@@ -202,7 +202,7 @@ class GrabElt(SeqEltBase):
         """
         self.detectors = dict_config.pop('detectors', [])
         self.selected = dict_config.pop('selected', [])
-        self.status = dict_config.pop('status', Status.SNAP)
+        self.status = Status(dict_config.pop('status', Status.SNAP.value))
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""

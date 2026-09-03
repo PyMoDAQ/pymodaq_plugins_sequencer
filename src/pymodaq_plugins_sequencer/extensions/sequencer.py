@@ -1,3 +1,7 @@
+from pathlib import Path
+import yaml
+
+from pymodaq_gui.utils import select_file
 from pymodaq_plugins_sequencer.utilities.sequencer.sequence import Sequence
 
 from qtpy import QtWidgets, QtCore
@@ -11,6 +15,8 @@ from pymodaq_utils.logger import set_logger, get_module_name
 from pymodaq.extensions.utils import CustomExt
 
 from pymodaq_plugins_sequencer.utilities.elements.sequence import SequenceElt
+from pymodaq_plugins_sequencer.utils import get_set_sequencer_path
+from pymodaq_plugins_sequencer.utilities.yaml_utils import PrettyListDumper
 
 logger = set_logger(get_module_name(__file__))
 
@@ -32,6 +38,7 @@ class Sequencer(CustomExt):
         self.sequence_container: QtWidgets.QWidget = None
         self.setup_ui()
 
+        self._current_path: Path = get_set_sequencer_path()
 
     def setup_docks_and_widgets(self):
         """Mandatory method to be subclassed to setup the docks layout
@@ -53,6 +60,15 @@ class Sequencer(CustomExt):
         self.sequences[name.lower()] = Sequence(name, widget, self.dashboard)
         self.sequence_container.layout().addWidget(widget)
         SequenceElt.sequences.append(self.sequences[name.lower()])
+
+    def remove_sequence(self, name: str = None):
+        if name is None:
+            name = list(self.sequences.keys())[-1]
+
+        seq = self.sequences.pop(name.lower())
+        self.sequence_container.layout().removeWidget(seq.parent)
+        seq.parent.setParent(None)
+        seq.parent.deleteLater()
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
         """Non mandatory method to be subclassed in order to create a menubar
@@ -94,12 +110,66 @@ class Sequencer(CustomExt):
         self.add_action('add_sequence', 'Add Sequence', 'add_circle',
                         tip='Add a sequence',
                         )
+        self.add_action('remove_sequence', 'Remove Sequence', 'remove',
+                        tip='Remove last sequence',
+                        )
+        self.toolbar.addSeparator()
+        self.add_action('load_sequence', 'Load Sequence', 'file_open',
+                        tip='Load a sequence file',
+                        )
+        self.add_action('save_sequence', 'Save Sequence', 'file_save',
+                        tip='Save as a sequence file',
+                        )
 
     def connect_things(self):
         """Connect actions and/or other widgets signal to methods"""
         self.connect_action('add_sequence',
                             lambda: self.add_sequence(f'Sequence{len(self.sequences):03.0f}'),)
+        self.connect_action('remove_sequence', lambda: self.remove_sequence(),)
+        self.connect_action('load_sequence', lambda: self.load_sequence())
+        self.connect_action('save_sequence', lambda: self.save_sequence())
 
+    def load_sequence(self, path: Path = None):
+        if path is None:
+            path = select_file(self._current_path,
+                               filter='Sequence file (*.seq)',
+                               save=False, ext='seq', force_save_extension=True)
+        if path is not None and path != '':
+            self._current_path = path.parent
+
+            with open(path, 'r') as file:
+                sequence_dict = yaml.safe_load(file)
+        if 'sequences' in sequence_dict:
+            while len(self.sequences) > 0:
+                self.remove_sequence()
+            for seq_name, sequence_dict in sequence_dict['sequences'].items():
+                self.add_sequence(seq_name)
+                self.sequences[seq_name].load_sequence(sequence_dict)
+        else:
+            while len(self.sequences) > 1:
+                self.remove_sequence()
+            self.sequences[list(self.sequences.keys())[0]].load_sequence(sequence_dict)
+
+    def save_sequence(self, path: Path = None):
+        if path is None:
+            path = select_file(self._current_path,
+                               filter='Sequence file (*.seq)',
+                               save=True, ext='seq', force_save_extension=True)
+        if path is not None and path != '':
+            self._current_path = path.parent
+            sequence_dict = {'sequences': {}}
+            for sequence_name, sequence in self.sequences.items():
+                sequence_dict['sequences'][sequence_name] = sequence.root_elt.to_dict()
+
+            with open(path, 'w') as file:
+                yaml.dump(
+                    sequence_dict,
+                    file,
+                    Dumper=PrettyListDumper,
+                    default_flow_style=False,
+                    sort_keys=False,
+                    allow_unicode=True
+                )
     def value_changed(self, param):
         """ Actions to perform when one of the param's value in self.settings is changed from the
         user interface

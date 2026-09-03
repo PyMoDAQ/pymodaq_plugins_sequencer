@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pymodaq_gui.utils.widgets.window import make_window
 from pymodaq_plugins_sequencer.utilities.states import (
     QStateMachine, MyQFinalState, QHistoryState, QState, QAbstractTransition, TrackedTransition, InterruptState,
@@ -218,6 +220,9 @@ class Sequence(CustomExt):
             False,
             self.interrupt_state,
             self.interrupt_state.source_state))
+
+    def load_sequence(self, path: Path | dict | str):
+        self._model.load_elements(path)
 
 
 def main():
