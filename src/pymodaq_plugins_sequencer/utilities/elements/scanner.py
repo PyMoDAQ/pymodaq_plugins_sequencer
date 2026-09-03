@@ -3,7 +3,7 @@ from typing import Any
 
 from serializall import SerializableFactory
 
-from qtpy import QtCore
+from qtpy import QtCore, QtWidgets
 
 from control_modules.daq_move import DAQ_Move
 from control_modules.enums import MoveType
@@ -71,17 +71,19 @@ class ScannerElt(SeqEltBase):
         self.scanner_ref = weakref.ref(Scanner(actuators=self.scanner.actuators_all,
                                                selected_actuators=self.scanner.actuators,
                                                orientation=Orientation.HORIZONTAL))
+
         base_widget.insert_widget(self.scanner_ref().parent_widget)
         self.scanner_ref().settings.child('actuators').show()
-
         self.scanner_ref().from_dict(self.scanner.to_dict(use_real_actuators=True))
 
-        self.scanner_ref().settings_updated_signal.connect(self._on_scanner_editor_update)
+        base_widget.parent().popup_hiding.connect(self._on_editor_closing)
+
         return base_widget
 
-    def _on_scanner_editor_update(self):
+    def _on_editor_closing(self):
         if self.scanner_ref is not None and self.scanner_ref() is not None:
             self.scanner.from_dict(self.scanner_ref().to_dict(use_real_actuators=True))
+            self.scanner.save_scanner_settings()
 
     def _execute(self, dte: DataToExport=None):
         if self._ind_execute == 0:
