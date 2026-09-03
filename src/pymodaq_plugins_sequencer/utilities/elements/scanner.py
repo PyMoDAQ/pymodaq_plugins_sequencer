@@ -5,6 +5,7 @@ from serializall import SerializableFactory
 
 from qtpy import QtCore
 
+from control_modules.daq_move import DAQ_Move
 from control_modules.enums import MoveType
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
@@ -36,11 +37,35 @@ class ScannerElt(SeqEltBase):
         self.scanner = Scanner()
         self.scanner_ref: weakref.ref[Scanner] = None
 
+        self._actuators_all_to_restore: list[str] = None
+        self._actuators_selected_to_restore: list[str] = None
+
     def initialize_element(self):
         self._ind_execute = 0
 
     def do_things_with_dashboard(self):
-        self.scanner.actuators_all = self.dashboard.modules_manager.actuators_all
+        if self._actuators_all_to_restore is not None:
+            act_all_to_restore: list[DAQ_Move] = []
+            for act_name in self._actuators_all_to_restore:
+                if act_name in self.dashboard.modules_manager.actuators_name:
+                    act_all_to_restore.append(
+                        self.dashboard.modules_manager.get_mod_from_name(act_name,
+                                                                         mod=ModuleType.Actuator))
+            self._actuators_all_to_restore = None
+        else:
+            act_all_to_restore = self.dashboard.modules_manager.actuators_all
+
+        act_selected_to_restore: list[DAQ_Move] = []
+        if self._actuators_selected_to_restore is not None:
+            for act_name in self._actuators_selected_to_restore:
+                if act_name in self.dashboard.modules_manager.actuators_name:
+                    act_selected_to_restore.append(
+                        self.dashboard.modules_manager.get_mod_from_name(act_name,
+                                                                         mod=ModuleType.Actuator))
+            self._actuators_selected_to_restore = None
+
+        self.scanner.actuators_all = act_all_to_restore
+        self.scanner.actuators = act_selected_to_restore
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         self.scanner_ref = weakref.ref(Scanner(actuators=self.scanner.actuators_all,
@@ -67,7 +92,7 @@ class ScannerElt(SeqEltBase):
             self.dashboard.modules_manager.move_actuators_with_callback(
                 dte_act = next_values,
                 mode= MoveType.ABS,
-                callback = None,
+                callback = self._on_move_done,
                 do_connect_modules=True)
 
             """ This will execute the children state and its bundled elements n_repeat times"""
@@ -77,6 +102,10 @@ class ScannerElt(SeqEltBase):
             self.done_signal.emit()
 
     def _on_move_done(self):
+        self.dashboard.modules_manager.forget_callback(self._on_move_done,
+                                                       module_type = ModuleType.Actuator,
+                                                       disconnect_modules = True
+                                                       )
         self.children_signal.emit()
 
     def to_dict_custom(self) -> dict[str, Any]:
@@ -91,6 +120,16 @@ class ScannerElt(SeqEltBase):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
+        #loading from file implies actuators is a list of str but at the moment of restoring the elt, the dashboard has
+        # not been set yet and self.scanner has also no actuators yet...
+        if len(dict_config['actuators']) > 0 and isinstance(dict_config['actuators'][0], str):
+            self._actuators_all_to_restore = dict_config['actuators']
+            dict_config['actuators'] = []  # will be restored later, when dashboard is set
+
+        if len(dict_config['selected']) > 0 and isinstance(dict_config['selected'][0], str):
+            self._actuators_selected_to_restore = dict_config['selected']
+            dict_config['selected'] = []  # will be restored later, when dashboard is set
+
         self.scanner.from_dict(dict_config)
 
     def _eq(self, other: 'ScannerElt'):
