@@ -151,7 +151,7 @@ class Sequence(CustomExt):
         for child in self.machine.children():
             if isinstance(child, QAbstractTransition):
                 self.machine.removeTransition(child)
-            elif isinstance(child, QState):
+            elif isinstance(child, QState | MyQFinalState):
                 self.machine.removeState(child)
 
         self.machine.addState(self.root_elt.mstate)
