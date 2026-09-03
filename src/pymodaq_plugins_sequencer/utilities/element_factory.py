@@ -246,7 +246,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         self.do_things_with_dashboard()
 
     def set_dashboard(self, dashboard: 'DashBoard'):
-        self.dashboard = dashboard    @property
+        self.dashboard = dashboard
 
     @property
     def parent_sequence(self) -> 'Sequence':
