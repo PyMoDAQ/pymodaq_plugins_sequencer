@@ -3,10 +3,12 @@ import weakref
 
 from serializall import SerializableFactory
 
-from qtpy import QtCore
+from qtpy import QtCore, QtGui
 
 from control_modules.daq_viewer import DAQ_Viewer
 from control_modules.daq_viewer_ui.ui_base import ActionIconNames
+from pymodaq_gui.managers.action_manager import QAction
+from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.logger import set_logger, get_module_name
 
 from pymodaq_data import DataToExport
@@ -23,6 +25,12 @@ ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
 
 
+class Status(StrEnum):
+    SNAP = 'Snap'
+    GRAB = 'Grab'
+    STOP = 'Stop'
+
+
 @SerializableFactory.register_decorator()
 @SeqEltFactory.register_elt()
 class GrabElt(SeqEltBase):
@@ -36,8 +44,7 @@ class GrabElt(SeqEltBase):
         self._detectors: list[str] = []
         self._selected: list[str] = []
 
-        self._is_continuous_grab = False
-        self._stop_status = False
+        self._status = Status.SNAP
 
         self._items: weakref.ref[ItemSelect] = None
         for child_name in ('actuators', 'probe_data', 'test_actuator'):
@@ -61,27 +68,15 @@ class GrabElt(SeqEltBase):
         self._selected = value
 
     @property
-    def is_continuous_grab(self) -> bool:
-        return self._is_continuous_grab
+    def status(self) -> Status | str:
+        return self._status
 
-    @is_continuous_grab.setter
-    def is_continuous_grab(self, continuous: bool):
-        self._is_continuous_grab = continuous
+    @status.setter
+    def status(self, status: Status):
+        self._status = status
 
-    def set_grab_state(self, continuous: bool):
-        self.is_continuous_grab = continuous
-
-    @property
-    def stop_status(self) -> bool:
-        return self._stop_status
-
-    @stop_status.setter
-    def stop_status(self, stop_status: bool):
-        self._stop_status = stop_status
-
-    def set_stop_status(self, stop_status: bool):
-        self.stop_status = stop_status
-
+    def set_status(self, status: Status):
+        self.status = status
 
     def do_things_with_dashboard(self):
         self.dashboard.experiment_manager.applied_entry.connect(self.update_modules)
@@ -111,26 +106,40 @@ class GrabElt(SeqEltBase):
         item_select.itemChanged.connect(self.update_detectors_from_combo)
         base_widget.insert_widget(item_select)
 
-        base_widget.add_action('snap', 'Snap/Grab',
-                        icon_name=ActionIconNames.SNAP,
-                        icon_checked=ActionIconNames.GRAB,
-                        checked=self.is_continuous_grab,
-                        tip='Snap or continuous Grab',
-                        toolbar=base_widget.toolbar)
+        base_widget.action_group = QtGui.QActionGroup(base_widget)
+        base_widget.action_group.setExclusive(True)
 
-        base_widget.connect_action('snap', self.set_grab_state)
+        base_widget.add_action(Status.SNAP, Status.SNAP,
+                               icon_name=ActionIconNames.SNAP,
+                               checkable=True,
+                               icon_checked_color=get_theme().green,
+                               tip='Snap',
+                               toolbar=base_widget.toolbar,
+                               before='execute')
+        base_widget.add_action(Status.GRAB, Status.GRAB,
+                               icon_name=ActionIconNames.GRAB,
+                               checkable=True,
+                               icon_checked_color=get_theme().green,
+                               tip='Grab',
+                               toolbar=base_widget.toolbar,
+                               before='execute')
+        base_widget.add_action(Status.STOP, Status.STOP,
+                               icon_name='stop_circle',
+                               tip='Stop any current Grab on the selected detectors',
+                               icon_checked_color=get_theme().green,
+                               checkable=True,
+                               toolbar=base_widget.toolbar,
+                               before='execute')
 
-        base_widget.add_action('stop', 'Stop',
-                        icon_name='stop_circle',
-                        tip='Stop any current Grab on the selected detectors',
-                        icon_checked_color=get_theme().red,
-                        checkable=True,
-                        checked=self.stop_status,
-                        toolbar=base_widget.toolbar)
+        for action_name in Status.values():
+            base_widget.action_group.addAction(base_widget.get_action(action_name))
 
-        base_widget.connect_action('stop', self.set_stop_status)
-
+        base_widget.action_group.triggered.connect(lambda action: self._on_actions_triggered(action.text()))
+        base_widget.set_action_checked(self.status, True)
         return base_widget
+
+    def _on_actions_triggered(self, action_name: str):
+        self.status = Status(action_name)
 
     def update_detectors_from_combo(self):
         if self._items is not None and self._items() is not None:
@@ -150,28 +159,25 @@ class GrabElt(SeqEltBase):
         self.filter_selected_wrt_manager()
         self.clean_signals()
 
-        if len(self.selected) > 0:
-            if self.stop_status:
-                for mod in self.get_selected_detectors():
-                    mod.stop()
-                self.clean_signals()
-                self.done_signal.emit()
-
-            else:
-                if not self.is_continuous_grab:
-                    self.modules_manager.selected_detectors_name = self.selected
-                    self.modules_manager.connect_detectors()
-                    dte = self.modules_manager.grab_data()
-                    self.modules_manager.connect_detectors(False)
-                    self.save_signal.emit(dte)
-                else:
-                    for mod in self.get_selected_detectors():
-                        mod.grab_done_signal.connect(self._save_data)
-                        mod.grab()
-                    self.done_signal.emit()
-        else:
+        if len(self.selected) == 0:
+            self.done_signal.emit()
+        elif self.status == Status.STOP:
+            for mod in self.get_selected_detectors():
+                mod.stop()
+            self.clean_signals()
             self.done_signal.emit()
 
+        elif self.status == Status.SNAP:
+            self.modules_manager.selected_detectors_name = self.selected
+            self.modules_manager.connect_detectors()
+            dte = self.modules_manager.grab_data()
+            self.modules_manager.connect_detectors(False)
+            self.save_signal.emit(dte)
+        else:
+            for mod in self.get_selected_detectors():
+                mod.grab_done_signal.connect(self._save_data)
+                mod.grab()
+            self.done_signal.emit()
 
     def _save_data(self, dte: DataToExport):
         #todo: do whatever is needed with those data,
@@ -188,8 +194,7 @@ class GrabElt(SeqEltBase):
         """
         return {'detectors': self.detectors,
                 'selected': self.selected,
-                'continuous_grab': self.is_continuous_grab,
-                'stop': self.stop_status,}
+                'status': self.status,}
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
@@ -197,16 +202,16 @@ class GrabElt(SeqEltBase):
         """
         self.detectors = dict_config.pop('detectors', [])
         self.selected = dict_config.pop('selected', [])
-        self.is_continuous_grab = dict_config.pop('continuous_grab', False)
-        self.stop_status = dict_config.pop('stop', False)
+        self.status = dict_config.pop('status', Status.SNAP)
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""
         return (self.detectors == other.detectors and
-                self.selected == other.selected)
+                self.selected == other.selected and
+                self.status == other.status)
 
     def __repr__(self):
-        return f"{super().__repr__()} - {self.selected} - {'Stop' if self.stop_status else 'Grab' if self.is_continuous_grab else 'Snap'}"
+        return f"{super().__repr__()} - {self.selected} - {self.status}"
 
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(250, 250)

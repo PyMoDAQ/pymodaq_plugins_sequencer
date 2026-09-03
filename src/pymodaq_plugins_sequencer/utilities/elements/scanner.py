@@ -76,7 +76,8 @@ class ScannerElt(SeqEltBase):
         self.scanner_ref().settings.child('actuators').show()
         self.scanner_ref().from_dict(self.scanner.to_dict(use_real_actuators=True))
 
-        base_widget.parent().popup_hiding.connect(self._on_editor_closing)
+        if base_widget.parent() is not None:
+            base_widget.parent().popup_hiding.connect(self._on_editor_closing)
 
         return base_widget
 
