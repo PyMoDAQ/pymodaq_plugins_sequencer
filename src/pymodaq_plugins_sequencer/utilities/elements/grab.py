@@ -3,20 +3,32 @@ import weakref
 
 from serializall import SerializableFactory
 
-from qtpy import QtCore
+from qtpy import QtCore, QtGui
 
+from control_modules.daq_viewer import DAQ_Viewer
+from control_modules.daq_viewer_ui.ui_base import ActionIconNames
+from pymodaq_gui.managers.action_manager import QAction
+from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.logger import set_logger, get_module_name
 
 from pymodaq_data import DataToExport
 from pymodaq_gui.parameter.pymodaq_ptypes.itemselect import ItemSelect
-from pymodaq_gui.utils.widgets import SpinBox
+
+
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
+from utils.managers.modules import ModuleType
 
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
+
+
+class Status(StrEnum):
+    SNAP = 'Snap'
+    GRAB = 'Grab'
+    STOP = 'Stop'
 
 
 @SerializableFactory.register_decorator()
@@ -31,6 +43,8 @@ class GrabElt(SeqEltBase):
         self.modules_manager = ModulesManager()
         self._detectors: list[str] = []
         self._selected: list[str] = []
+
+        self._status = Status.SNAP
 
         self._items: weakref.ref[ItemSelect] = None
         for child_name in ('actuators', 'probe_data', 'test_actuator'):
@@ -53,17 +67,24 @@ class GrabElt(SeqEltBase):
     def selected(self, value: list[str]):
         self._selected = value
 
+    @property
+    def status(self) -> Status | str:
+        return self._status
+
+    @status.setter
+    def status(self, status: Status):
+        self._status = status
+
+    def set_status(self, status: Status):
+        self.status = status
+
     def do_things_with_dashboard(self):
         self.dashboard.experiment_manager.applied_entry.connect(self.update_modules)
         self.update_modules()
 
     def update_modules(self):
         self.modules_manager.detectors_all = self.dashboard.modules_manager.detectors_all
-        self.modules_manager.selected_detectors_name = [det.title for det in  self.dashboard.modules_manager.detectors_all]
-        self.modules_manager.actuators_all = self.dashboard.modules_manager.actuators_all
-        self.modules_manager.selected_actuators_name = [act.title for act in self.dashboard.modules_manager.actuators_all]
         self.detectors = self.modules_manager.detectors_name
-        self.selected = self.detectors
         self.filter_selected_wrt_manager()
 
     def filter_selected_wrt_manager(self):
@@ -77,28 +98,85 @@ class GrabElt(SeqEltBase):
                                f'the ModulesManager instance/ DashBoard')
         self.selected = selected
 
-    def _create_widget(self, base_widget:WidgetWithToolbar) -> WidgetWithToolbar:
+    def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
         item_select = ItemSelect(hasCheckbox=True, parent=base_widget)
         self._items = weakref.ref(item_select)
-        item_select.set_value(dict(all_items=self.modules_manager.detectors_name,
-                                   selected = self.modules_manager.selected_detectors_name,))
+        item_select.set_value(dict(all_items=self.detectors,
+                                   selected = self.selected,))
         item_select.itemChanged.connect(self.update_detectors_from_combo)
         base_widget.insert_widget(item_select)
+
+        base_widget.action_group = QtGui.QActionGroup(base_widget)
+        base_widget.action_group.setExclusive(True)
+
+        base_widget.add_action(Status.SNAP, Status.SNAP,
+                               icon_name=ActionIconNames.SNAP,
+                               checkable=True,
+                               icon_checked_color=get_theme().green,
+                               tip='Snap',
+                               toolbar=base_widget.toolbar,
+                               before='execute')
+        base_widget.add_action(Status.GRAB, Status.GRAB,
+                               icon_name=ActionIconNames.GRAB,
+                               checkable=True,
+                               icon_checked_color=get_theme().green,
+                               tip='Grab',
+                               toolbar=base_widget.toolbar,
+                               before='execute')
+        base_widget.add_action(Status.STOP, Status.STOP,
+                               icon_name='stop_circle',
+                               tip='Stop any current Grab on the selected detectors',
+                               icon_checked_color=get_theme().green,
+                               checkable=True,
+                               toolbar=base_widget.toolbar,
+                               before='execute')
+
+        for action_name in Status.values():
+            base_widget.action_group.addAction(base_widget.get_action(action_name))
+
+        base_widget.action_group.triggered.connect(lambda action: self._on_actions_triggered(action.text()))
+        base_widget.set_action_checked(self.status, True)
         return base_widget
+
+    def _on_actions_triggered(self, action_name: str):
+        self.status = Status(action_name)
 
     def update_detectors_from_combo(self):
         if self._items is not None and self._items() is not None:
             self.selected = self._items().get_value()['selected']
 
+    def clean_signals(self):
+        for mod in self.get_selected_detectors():
+            try:
+                mod.grab_done_signal.disconnect(self._save_data)
+            except TypeError as e:
+                pass
+
+    def get_selected_detectors(self) -> list[DAQ_Viewer]:
+        return [self.modules_manager.get_mod_from_name(det, mod=ModuleType.Detector) for det in self.selected]
+
     def _execute(self, dte: DataToExport=None):
         self.filter_selected_wrt_manager()
-        if len(self.selected) > 0:
+        self.clean_signals()
+
+        if len(self.selected) == 0:
+            self.done_signal.emit()
+        elif self.status == Status.STOP:
+            for mod in self.get_selected_detectors():
+                mod.stop()
+            self.clean_signals()
+            self.done_signal.emit()
+
+        elif self.status == Status.SNAP:
             self.modules_manager.selected_detectors_name = self.selected
             self.modules_manager.connect_detectors()
             dte = self.modules_manager.grab_data()
             self.modules_manager.connect_detectors(False)
             self.save_signal.emit(dte)
         else:
+            for mod in self.get_selected_detectors():
+                mod.grab_done_signal.connect(self._save_data)
+                mod.grab()
             self.done_signal.emit()
 
     def _save_data(self, dte: DataToExport):
@@ -115,22 +193,25 @@ class GrabElt(SeqEltBase):
         to be reimplemented
         """
         return {'detectors': self.detectors,
-                'selected': self.selected}
+                'selected': self.selected,
+                'status': self.status,}
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
-        self.detectors = dict_config.pop('detectors')
-        self.selected = dict_config.pop('selected')
+        self.detectors = dict_config.pop('detectors', [])
+        self.selected = dict_config.pop('selected', [])
+        self.status = dict_config.pop('status', Status.SNAP)
 
     def _eq(self, other: 'GrabElt'):
         """ Custom method to reimplement to assert two elements are equals"""
         return (self.detectors == other.detectors and
-                self.selected == other.selected)
+                self.selected == other.selected and
+                self.status == other.status)
 
     def __repr__(self):
-        return f'{super().__repr__()} - {self.selected}'
+        return f"{super().__repr__()} - {self.selected} - {self.status}"
 
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(250, 250)

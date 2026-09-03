@@ -12,7 +12,7 @@ from qt_themes import get_theme
 from serializall import SerializableFactory, SerializableBase
 
 from pymodaq_data import DataToExport
-from pymodaq_gui.managers.action_manager import ActionManager
+from pymodaq_gui.managers.action_manager import ActionManager, QAction, addaction
 from pymodaq_gui.managers.parameter_manager import ParameterManager
 from pymodaq_gui.qt_utils import mkQApp
 from pymodaq_gui.utils.widgets import LabelWithFont
@@ -312,13 +312,11 @@ class SeqEltBase(QtCore.QObject, ActionManager):
                                     parent=base_widget)
         base_widget.add_widget_top(id_widget)
         base_widget.add_widget_top(name_widget)
-
-        self.add_action('execute', 'Execute', 'start',
-                        tip='Execute the Sequencer Element',
-                        icon_color=get_theme().magenta,
-                        toolbar=base_widget.toolbar)
-
-        self.connect_action('execute', self.execute)
+        base_widget.add_action('execute', 'Execute', 'start',
+                               tip='Execute the Sequencer Element',
+                               icon_color=get_theme().magenta,
+                               toolbar=base_widget.toolbar)
+        base_widget.connect_action('execute', self.execute)
         return base_widget
 
     @classmethod
