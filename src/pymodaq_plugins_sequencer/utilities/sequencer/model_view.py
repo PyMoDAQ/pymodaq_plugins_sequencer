@@ -33,6 +33,15 @@ seq_factory = SeqEltFactory()
 ser_factory = SerializableFactory()
 
 
+class FrameClosing(QtWidgets.QFrame):
+    popup_hiding = QtCore.Signal()
+
+    def hideEvent(self, event):  # for when the popup is "hidden" (when pressing enter for instance)
+        self.popup_hiding.emit()
+        super().hideEvent(event)
+
+
+
 def elt_level(index: QModelIndex) -> int:
     """ Calculate nesting depth of the element with the specified index """
     depth = 0
@@ -75,7 +84,7 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
         if seq_elt:
             if seq_elt.name == AddButtonPlaceholder.elt_name:
                 return None
-            container = QtWidgets.QFrame(parent)
+            container = FrameClosing(parent)
             container.setWindowFlags(Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
             widget = seq_elt.create_widget(container)
             container.setObjectName("container")

@@ -72,8 +72,6 @@ class CompositeState(MyState):
         if value and hasattr(self._elt, 'initialize_element'):
             self._elt.initialize_element()
 
-
-
     def setup_states(self):
         self.setObjectName(f'State of the elt: {self._elt}')
 
