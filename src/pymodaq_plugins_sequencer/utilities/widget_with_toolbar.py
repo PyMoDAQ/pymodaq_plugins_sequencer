@@ -1,11 +1,11 @@
 
 from qtpy import QtWidgets, QtCore
 
-
+from pymodaq_gui.managers.action_manager import QAction, addaction, ActionManager
 from pymodaq_gui.utils.styling import Font
 
 
-class WidgetWithToolbar(QtWidgets.QWidget):
+class WidgetWithToolbar(QtWidgets.QWidget, ActionManager):
     """ Create a Widget with a vertical layout containing a title and
     subwidgets
     """
@@ -13,6 +13,8 @@ class WidgetWithToolbar(QtWidgets.QWidget):
     def __init__(self, subwidget:QtWidgets.QWidget = None, parent=None,
                  **label_kwargs):
         QtWidgets.QWidget.__init__(self, parent)
+
+        ActionManager.__init__(self, toolbar=QtWidgets.QToolBar(self))
         self.font = Font(**label_kwargs)
 
         self.top_widget = QtWidgets.QWidget()
@@ -22,7 +24,6 @@ class WidgetWithToolbar(QtWidgets.QWidget):
         self.layout().setContentsMargins(0, 0, 0, 0)
         self.layout().addWidget(self.top_widget)
 
-        self.toolbar = QtWidgets.QToolBar(self)
         self.top_widget.layout().addWidget(self.toolbar)
         self.top_widget.layout().addStretch()
 
@@ -30,7 +31,6 @@ class WidgetWithToolbar(QtWidgets.QWidget):
 
         if subwidget is not None:
             self.layout().addWidget(subwidget)
-        #self.layout().addStretch()
 
     def give_focus_to(self, widget: QtWidgets.QWidget):
         self._widget_with_focus = widget
@@ -56,7 +56,6 @@ class WidgetWithToolbar(QtWidgets.QWidget):
             self._widget_with_focus.setFocus()
             if hasattr(self._widget_with_focus, 'selectAll'):
                 self._widget_with_focus.selectAll()
-
 
 
 if __name__ == '__main__':
