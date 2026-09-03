@@ -30,7 +30,7 @@ class WidgetWithToolbar(QtWidgets.QWidget):
 
         if subwidget is not None:
             self.layout().addWidget(subwidget)
-        self.layout().addStretch()
+        #self.layout().addStretch()
 
     def give_focus_to(self, widget: QtWidgets.QWidget):
         self._widget_with_focus = widget
