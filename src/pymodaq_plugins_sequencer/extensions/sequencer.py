@@ -1,19 +1,20 @@
 from pathlib import Path
 import yaml
 
+from pymodaq.utils.h5modules.module_saving import LoggerSaver
 from pymodaq_gui.utils import select_file
 from pymodaq_plugins_sequencer.utilities.sequencer.sequence import Sequence
 
 from qtpy import QtWidgets, QtCore
 
 from pymodaq_gui import utils as gutils
-from pymodaq_gui.utils.shared_ui import MenuToolbarNames
+from pymodaq_gui.utils.enums import MenuToolbarNames
 
 from pymodaq_utils.config import Config, GlobalConfig
 from pymodaq_utils.logger import set_logger, get_module_name
 
 from pymodaq.extensions.utils import CustomExt
-
+from pymodaq_gui.utils.widgets import QLED
 from pymodaq_plugins_sequencer.utilities.elements.sequence import SequenceElt
 from pymodaq_plugins_sequencer.utils import get_set_sequencer_path
 from pymodaq_plugins_sequencer.utilities.yaml_utils import PrettyListDumper
@@ -27,6 +28,27 @@ EXTENSION_NAME = 'Sequencer'
 CLASS_NAME = 'Sequencer'
 
 
+class StatusBarManager:
+    def __init__(self, app: 'Sequencer'):
+        self.app = app
+
+        self._running_led: QLED = None
+
+    @property
+    def statusbar(self):
+        return self.app.statusbar
+
+    def set_permanent_status(self, status: str):
+        self.app.set_permanent_status(status)
+
+    def create_permanent_widgets(self):
+        self._running_led = QLED()
+        self._running_led.setToolTip('logging status: green (running), red (idle)')
+        self._running_led.clickable = False
+        self.statusbar.addPermanentWidget(self._running_led)
+
+
+
 class Sequencer(CustomExt):
 
     params = []
@@ -35,10 +57,20 @@ class Sequencer(CustomExt):
         super().__init__(parent, dashboard, add_toolbar_break=False)
 
         self.sequences: dict[str, Sequence] = {}
+        self.sequence_names: list[str] = []
         self.sequence_container: QtWidgets.QWidget = None
+        self.status_manager = StatusBarManager(self)
+        self._module_and_data_saver = LoggerSaver(self)
         self.setup_ui()
 
         self._current_path: Path = get_set_sequencer_path()
+
+    def do_things_after_ui_setup(self):
+        self.add_sequence('Main')
+
+    @property
+    def module_and_data_saver(self) -> LoggerSaver:
+        return super().module_and_data_saver
 
     def setup_docks_and_widgets(self):
         """Mandatory method to be subclassed to setup the docks layout
@@ -53,13 +85,21 @@ class Sequencer(CustomExt):
         self.sequence_container.setLayout(QtWidgets.QHBoxLayout())
         self.mainwindow.setCentralWidget(self.sequence_container)
 
-        self.add_sequence('Main')
+        self.populate_status_bar()
+
+    def populate_status_bar(self):
+        super().populate_status_bar()
+        self.status_manager.create_permanent_widgets()
+        self.status_manager.set_permanent_status('')
 
     def add_sequence(self, name: str = 'Main'):
+
         widget = QtWidgets.QWidget()
+        self.sequence_names.append(name.lower())
         self.sequences[name.lower()] = Sequence(name, widget, self.dashboard)
         self.sequence_container.layout().addWidget(widget)
         SequenceElt.sequences.append(self.sequences[name.lower()])
+        self.set_action_enabled('remove_sequence', len(self.sequences) > 1)
 
     def remove_sequence(self, name: str = None):
         if name is None:
@@ -69,6 +109,7 @@ class Sequencer(CustomExt):
         self.sequence_container.layout().removeWidget(seq.parent)
         seq.parent.setParent(None)
         seq.parent.deleteLater()
+        self.set_action_enabled('remove_sequence', len(self.sequences) > 1)
 
     def setup_menus_and_toolbars(self, menubar: QtWidgets.QMenuBar = None):
         """Non mandatory method to be subclassed in order to create a menubar
@@ -81,12 +122,12 @@ class Sequencer(CustomExt):
         """
         self.add_menu(MenuToolbarNames.FILE, MenuToolbarNames.FILE.capitalize(), parent_menu=menubar)
         self.add_menu(MenuToolbarNames.TOOLS, MenuToolbarNames.TOOLS.capitalize(), parent_menu=menubar)
+        self.add_menu('actions', 'Actions', parent_menu=menubar)
 
-    def do_things_after_ui_setup(self):
         self.create_dashboard_toolbar(add_break=False)
 
     def do_things_after_experiment_set(self, experiment_name: str, show_dashboard: bool = None):
-        pass
+        super().do_things_after_experiment_set(experiment_name, show_dashboard)
 
     def setup_actions(self):
         """Method where to create actions to be subclassed. Mandatory
@@ -104,14 +145,20 @@ class Sequencer(CustomExt):
         ActionManager.add_action
         """
 
-        self.add_action('show_file', 'Show file content', 'folder_data',
-                        tip='Browse the content of the current HDF5 file')
+        self.add_action('start', 'Start Logging', 'motion_play',
+                        "Start the Global Sequence",
+                        menu='actions', icon_color=self.get_theme().green)
+        self.add_action('stop', 'Stop Logging', 'stop_circle', "Stop the Global Sequence",
+                        menu='actions', icon_color=self.get_theme().red)
+        self.add_action('pause', 'Pause Logging', 'pause_circle', "Pause/resume the Global Sequence",
+                        checkable=True, menu='actions',
+                        icon_checked_color=self.get_theme().orange)
         self.toolbar.addSeparator()
         self.add_action('add_sequence', 'Add Sequence', 'add_circle',
                         tip='Add a sequence',
                         )
         self.add_action('remove_sequence', 'Remove Sequence', 'remove',
-                        tip='Remove last sequence',
+                        tip='Remove last sequence', enabled=False,
                         )
         self.toolbar.addSeparator()
         self.add_action('load_sequence', 'Load Sequence', 'file_open',
@@ -128,6 +175,10 @@ class Sequencer(CustomExt):
         self.connect_action('remove_sequence', lambda: self.remove_sequence(),)
         self.connect_action('load_sequence', lambda: self.load_sequence())
         self.connect_action('save_sequence', lambda: self.save_sequence())
+
+        self.connect_action('start', self.start)
+        self.connect_action('stop', self.stop)
+        self.connect_action('pause', self.pause)
 
     def load_sequence(self, path: Path = None):
         if path is None:
@@ -186,6 +237,23 @@ class Sequencer(CustomExt):
         """
         pass
 
+    @property
+    def main_sequence(self) -> Sequence:
+        return self.sequences[self.sequence_names[0]]
+
+    def start(self):
+        self.set_action_enabled('start', False)
+        self.main_sequence.sequence_finished.connect(self.stop)
+        self.main_sequence.get_action('start').trigger()
+
+    def pause(self):
+        for sequence in self.sequences.values():
+            sequence.get_action('pause').trigger()
+
+    def stop(self):
+        self.set_action_enabled('start', True)
+        for sequence in self.sequences.values():
+            sequence.get_action('stop').trigger()
 
 def main():
     import sys

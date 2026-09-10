@@ -7,8 +7,7 @@ from pymodaq_plugins_sequencer.utilities.states import (
 
 from qtpy import QtWidgets, QtCore
 
-from pymodaq_gui import utils as gutils
-from pymodaq_gui.utils.shared_ui import MenuToolbarNames
+
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, ElementError
 from pymodaq_plugins_sequencer.utilities.sequencer.model_view import SequenceTreeView, SequenceTreeModel, \
     SequenceWidgetDelegate
@@ -25,7 +24,7 @@ main_config = GlobalConfig()
 
 
 class Sequence(CustomExt):
-
+    sequence_finished = QtCore.Signal()
     params = []
 
     def __init__(self, title: str, parent: QtWidgets.QWidget, dashboard):
@@ -196,6 +195,7 @@ class Sequence(CustomExt):
         return res
 
     def start_sequence(self):
+        self.set_action_enabled('start', False)
         self.label.setText('Machine starting')
         self.recursive_connect_elts()
         self.setup_machine()
@@ -206,7 +206,9 @@ class Sequence(CustomExt):
         self.machine.start()
 
     def sequence_stopped(self):
+        self.set_action_enabled('start', True)
         self.label.setText('Machine finished')
+        self.sequence_finished.emit()
 
     def pause_sequence(self):
         # clear previsously set transition

@@ -5,8 +5,8 @@ from serializall import SerializableFactory
 
 from qtpy import QtCore, QtGui
 
-from control_modules.daq_viewer import DAQ_Viewer
-from control_modules.daq_viewer_ui.ui_base import ActionIconNames
+from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+from pymodaq.control_modules.daq_viewer_ui.ui_base import ActionIconNames
 from pymodaq_gui.managers.action_manager import QAction
 from pymodaq_utils.enums import StrEnum
 from pymodaq_utils.logger import set_logger, get_module_name
@@ -19,7 +19,7 @@ from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqE
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
-from utils.managers.modules import ModuleType
+from pymodaq.utils.managers.modules import ModuleType
 
 ser_factory = SerializableFactory()
 logger = set_logger(get_module_name(__file__))
