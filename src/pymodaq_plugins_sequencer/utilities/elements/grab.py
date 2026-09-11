@@ -175,7 +175,8 @@ class GrabElt(SeqEltBase):
             self.save_signal.emit(dte)
         else:
             for mod in self.get_selected_detectors():
-                mod.grab_done_signal.connect(self._save_data)
+                mod.grab_done_signal.connect(self.save_data)  # without underscore to trigger whatever is necessary in
+                # base class. You can do specific things in the _save_data reimplemented method
                 mod.grab()
             self.done_signal.emit()
 

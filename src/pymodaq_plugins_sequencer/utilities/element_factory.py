@@ -65,6 +65,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
     children_signal = QtCore.Signal()
     done_signal = QtCore.Signal()
     save_signal = QtCore.Signal(DataToExport)
+    data_to_log_signal = QtCore.Signal(DataToExport)
     go_to_signal = QtCore.Signal(int)
 
     children_allowed = False
@@ -119,6 +120,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def save_data(self, dte: DataToExport):
         self._save_data(dte)
+        self.data_to_log_signal.emit(dte)
         self.done_signal.emit()
 
     @property

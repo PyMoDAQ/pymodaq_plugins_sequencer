@@ -1,3 +1,5 @@
+from typing import Callable
+
 from pathlib import Path
 
 from pymodaq_gui.utils.widgets.window import make_window
@@ -33,6 +35,8 @@ class Sequence(CustomExt):
 
         self.view: SequenceTreeView = None
         self._model: SequenceTreeModel = None
+
+        self.log_callback: Callable = None
 
         self.machine = QStateMachine()
         self.done_state = MyQFinalState()
@@ -161,12 +165,26 @@ class Sequence(CustomExt):
         self.machine.setInitialState(self.root_elt.mstate)
         self.root_elt.mstate.addTransition(self.root_elt.mstate.finished, self.done_state)
 
+    def recursive_disconnect_elts(self, elt: SeqEltBase=None):
+        if elt is None:
+            elt = self.root_elt
+
+        for ind_child, child in enumerate(elt.children_without_add):
+            try:
+                child.data_to_log_signal.disconnect()
+            except AttributeError:
+                pass
+            child.mstate.clear_state_and_transitions()
+            if child.children_allowed:
+                self.recursive_disconnect_elts(child)
+
     def recursive_connect_elts(self, elt: SeqEltBase = None):
         if elt is None:
             elt = self.root_elt
 
         for ind_child, child in enumerate(elt.children_without_add):
-            child.mstate.clear_state_and_transitions()
+            if self.log_callback is not None:
+                child.data_to_log_signal.connect(self.log_callback)
             child.mstate.setParent(elt.mstate.children_state)
             child.mstate.addTransition(
                 ValueTransition(self.get_action('pause').triggered,
@@ -194,8 +212,13 @@ class Sequence(CustomExt):
                 logger.error(str(e))
         return res
 
-    def start_sequence(self):
+    def set_log_callback(self, log_callback: Callable):
+        """ Set a Callback for all element to log (if any) their data into the log h5 file"""
+        self.log_callback = log_callback
+
+    def start_sequence(self,):
         self.set_action_enabled('start', False)
+        self.recursive_disconnect_elts()
         self.label.setText('Machine starting')
         self.recursive_connect_elts()
         self.setup_machine()
@@ -206,6 +229,7 @@ class Sequence(CustomExt):
         self.machine.start()
 
     def sequence_stopped(self):
+
         self.set_action_enabled('start', True)
         self.label.setText('Machine finished')
         self.sequence_finished.emit()
