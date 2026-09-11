@@ -174,9 +174,16 @@ class Sequence(CustomExt):
                 child.data_to_log_signal.disconnect()
             except AttributeError:
                 pass
+            try:
+                child.mstate.entered.disconnect()
+            except AttributeError:
+                pass
             child.mstate.clear_state_and_transitions()
             if child.children_allowed:
                 self.recursive_disconnect_elts(child)
+
+    def selected_index_from_entered_state(self, child: SeqEltBase) -> Callable:
+        return lambda: self.view.setCurrentIndex(self._model.index_from_element(child))
 
     def recursive_connect_elts(self, elt: SeqEltBase = None):
         if elt is None:
@@ -186,6 +193,7 @@ class Sequence(CustomExt):
             if self.log_callback is not None:
                 child.data_to_log_signal.connect(self.log_callback)
             child.mstate.setParent(elt.mstate.children_state)
+            child.mstate.entered.connect(self.selected_index_from_entered_state(child))
             child.mstate.addTransition(
                 ValueTransition(self.get_action('pause').triggered,
                                 True,
