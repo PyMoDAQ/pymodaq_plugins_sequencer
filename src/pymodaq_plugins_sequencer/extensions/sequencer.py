@@ -144,13 +144,13 @@ class Sequencer(CustomExt):
         self.status_manager.create_permanent_widgets()
         self.status_manager.set_permanent_status('')
 
-    def add_sequence(self, name: str = 'Main'):
+    def add_sequence(self, name: str = 'main'):
 
         widget = QtWidgets.QWidget()
         self.sequence_names.append(name.lower())
-        self.sequences[name.lower()] = Sequence(name, widget, self.dashboard)
+        self.sequences[name.lower()] = Sequence(name.lower(), widget, self.dashboard)
         self.sequence_container.layout().addWidget(widget)
-        SequenceElt.sequences.append(self.sequences[name.lower()])
+        SequenceElt.register_sequence(self.sequences[name.lower()])
         self.set_action_enabled('remove_sequence', len(self.sequences) > 1)
 
     def remove_sequence(self, name: str = None):
@@ -252,9 +252,13 @@ class Sequencer(CustomExt):
         if 'sequences' in sequence_dict:
             while len(self.sequences) > 0:
                 self.remove_sequence()
-            for seq_name, sequence_dict in sequence_dict['sequences'].items():
+            for seq_name in sequence_dict['sequences']:
+                # first, creates all the Sequence objects
                 self.add_sequence(seq_name)
-                self.sequences[seq_name].load_sequence(sequence_dict)
+            for seq_name, seq_dict in sequence_dict['sequences'].items():
+                # then load the sequence content (eventually containing other sequences references,
+                # hence creating all of them first
+                self.sequences[seq_name].load_sequence(seq_dict)
         else:
             while len(self.sequences) > 1:
                 self.remove_sequence()
@@ -299,6 +303,10 @@ class Sequencer(CustomExt):
     @property
     def main_sequence(self) -> Sequence:
         return self.sequences[self.sequence_names[0]]
+
+    def save_callback(self, dte: DataToExport):
+        self._n_emitted += 1
+        self.saver_worker.data_to_save_signal.emit(dte)
 
     def start(self):
         self._init_logging()

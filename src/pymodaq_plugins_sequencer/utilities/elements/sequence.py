@@ -27,6 +27,11 @@ class SequenceElt(SeqEltBase):
     children_allowed = False
     sequences: list['Sequence'] = []
 
+    @classmethod
+    def register_sequence(cls, sequence: 'Sequence'):
+        if sequence.title not in [seq.title for seq in cls.sequences]:
+            cls.sequences.append(sequence)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._sequence: str = None
