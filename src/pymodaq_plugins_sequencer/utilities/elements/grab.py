@@ -148,7 +148,7 @@ class GrabElt(SeqEltBase):
     def clean_signals(self):
         for mod in self.get_selected_detectors():
             try:
-                mod.grab_done_signal.disconnect(self._save_data)
+                mod.grab_done_signal.disconnect(self.save_data)
             except TypeError as e:
                 pass
 
@@ -168,23 +168,29 @@ class GrabElt(SeqEltBase):
             self.done_signal.emit()
 
         elif self.status == Status.SNAP:
+            # trigger an async snap (but state holds until data has been acquired)
             self.modules_manager.selected_detectors_name = self.selected
-            self.modules_manager.connect_detectors()
-            dte = self.modules_manager.grab_data()
-            self.modules_manager.connect_detectors(False)
-            self.save_signal.emit(dte)
+            self.modules_manager.grab_data_with_callback(
+                callback=self._data_snapped,
+            )
         else:
+            # trigger a grab and immediately move on to the next state!
             for mod in self.get_selected_detectors():
                 mod.grab_done_signal.connect(self.save_data)  # without underscore to trigger whatever is necessary in
                 # base class. You can do specific things in the _save_data reimplemented method
                 mod.grab()
             self.done_signal.emit()
 
+    def _data_snapped(self, dte: DataToExport):
+        self.modules_manager.forget_callback(self._data_snapped,
+                                             module_type=ModuleType.Detector,
+                                             disconnect_modules=True)
+        self.save_data(dte)
+        self.done_signal.emit()
+
     def _save_data(self, dte: DataToExport):
         #todo: do whatever is needed with those data,
-        # probably add them in a Queue (like the ramping extension)
-        # could also be done into another state (saving_state for instance), to do the saving. However
-        # it is not necessary to hold the machine to save if using the Queue mechanism
+        # a log mechanism is already implemented within save_data (and the main Sequencer app)
         pass
 
     def to_dict_custom(self) -> dict[str, Any]:
