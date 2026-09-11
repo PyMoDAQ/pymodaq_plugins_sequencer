@@ -3,6 +3,7 @@ import yaml
 
 from pymodaq.utils.h5modules.module_saving import LoggerSaver
 from pymodaq_data import DataToExport
+from pymodaq_gui.managers.h5manager import FileAction
 from pymodaq_gui.managers.runner_thread_manager import WorkerThreadManager
 from pymodaq_gui.utils import select_file
 from pymodaq_plugins_sequencer.utilities.sequencer.sequence import Sequence
@@ -123,9 +124,18 @@ class Sequencer(CustomExt):
         self.sequence_container = QtWidgets.QWidget()
         self.sequence_container.setLayout(QtWidgets.QHBoxLayout())
         self.hor_widget.layout().addWidget(self.sequence_container)
-        self.hor_widget.layout().addWidget(self.h5_manager.h5saver.settings_tree)
+
+        settings_widget = QtWidgets.QWidget()
+        settings_widget.setLayout(QtWidgets.QVBoxLayout())
+
+        self.hor_widget.layout().addWidget(settings_widget)
+        settings_widget.layout().addWidget(self.settings_tree)
+        settings_widget.layout().addWidget(self.h5_manager.h5saver.settings_tree)
+
         self.mainwindow.setCentralWidget(self.hor_widget)
         self.h5_manager.h5saver.settings_tree.setVisible(False)
+        self.settings_tree.setVisible(False)
+        self.settings_tree.setMinimumHeight(150)
 
         self.populate_status_bar()
 
@@ -224,6 +234,11 @@ class Sequencer(CustomExt):
         self.connect_action('stop', self.stop)
         self.connect_action('pause', self.pause)
 
+        self.h5_manager.connect_action(FileAction.SHOW_SETTINGS, self.show_settings)
+
+    def show_settings(self, show=True):
+        self.settings_tree.setVisible(show)
+
     def load_sequence(self, path: Path = None):
         if path is None:
             path = select_file(self._current_path,
@@ -304,8 +319,23 @@ class Sequencer(CustomExt):
         for sequence in self.sequences.values():
             sequence.get_action('stop').trigger()
 
-    def stopped(self):
+    def stopped(self, msg: str = None):
+        #1 Stop the emission of data immediately
+        for sequence in self.sequences.values():
+            sequence.recursive_disconnect_elts()
+
+        #2 terminate the saver worker once its queue is empty
+        if self.settings['worker', 'worker_tasks'] == 0:
+            self.terminate_worker()
+        else:
+            self._worker_done.connect(self.terminate_worker)
+
+        #3 update the GUI
+        self.set_action_checked('pause', False)
         self.set_action_enabled('start', True)
+        if msg is not None:
+            self.update_status(msg)
+            self.status_manager.set_permanent_status(msg)
 
     def _init_logging(self):
         try:
