@@ -79,6 +79,7 @@ class SaverWorker(QtCore.QObject):
 
 
 class Sequencer(CustomExt):
+    show_h5file_statusbar_widgets = True
     _worker_done = QtCore.Signal()
     params = [
         {'title': 'Worker:', 'name': 'worker', 'type': 'group', 'children': [
@@ -117,11 +118,14 @@ class Sequencer(CustomExt):
         --------
         pyqtgraph.dockarea.Dock
         """
-
-
+        self.hor_widget = QtWidgets.QWidget()
+        self.hor_widget.setLayout(QtWidgets.QHBoxLayout())
         self.sequence_container = QtWidgets.QWidget()
         self.sequence_container.setLayout(QtWidgets.QHBoxLayout())
-        self.mainwindow.setCentralWidget(self.sequence_container)
+        self.hor_widget.layout().addWidget(self.sequence_container)
+        self.hor_widget.layout().addWidget(self.h5_manager.h5saver.settings_tree)
+        self.mainwindow.setCentralWidget(self.hor_widget)
+        self.h5_manager.h5saver.settings_tree.setVisible(False)
 
         self.populate_status_bar()
 
@@ -158,6 +162,8 @@ class Sequencer(CustomExt):
         --------
         pymodaq.utils.managers.action_manager.ActionManager
         """
+        self.add_toolbar(MenuToolbarNames.FILE, MenuToolbarNames.FILE.capitalize(), self.mainwindow,
+                         toolbar=self.h5_manager.toolbar, add_break=False)
         self.add_menu(MenuToolbarNames.FILE, MenuToolbarNames.FILE.capitalize(), parent_menu=menubar)
         self.add_menu(MenuToolbarNames.TOOLS, MenuToolbarNames.TOOLS.capitalize(), parent_menu=menubar)
         self.add_menu('actions', 'Actions', parent_menu=menubar)
@@ -281,6 +287,8 @@ class Sequencer(CustomExt):
 
     def start(self):
         self._init_logging()
+        for sequence in self.sequences.values():
+            sequence.set_log_callback(self.saver_worker.save_data)
 
         self._n_emitted = 0
 
