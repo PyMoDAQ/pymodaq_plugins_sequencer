@@ -365,7 +365,7 @@ class SequenceTreeModel(QtCore.QAbstractItemModel):
     def recursive_insert(self, parent_index: QModelIndex | None,
                          elt: SeqEltBase,
                          row: int = None) -> None:
-        """ Insert this elt adn its children at the specified row of the specified parent index
+        """ Insert this elt and its children at the specified row of the specified parent index
 
         If parent_index is not valid => parent is the root elt
         If it is None, elt is the RootElt (do not insert it, only its children)

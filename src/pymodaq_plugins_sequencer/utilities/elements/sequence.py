@@ -27,17 +27,17 @@ class SequenceElt(SeqEltBase):
     children_allowed = False
     sequences: list['Sequence'] = []
 
-    @classmethod
-    def register_sequence(cls, sequence: 'Sequence'):
-        if sequence.title not in [seq.title for seq in cls.sequences]:
-            cls.sequences.append(sequence)
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._sequence: str = None
         self.sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
 
         self._combo: weakref.ref[ComboBox] | None = None  # weakref to the combobox holding the states
+
+    @classmethod
+    def register_sequence(cls, sequence: 'Sequence'):
+        if sequence.title not in [seq.title for seq in cls.sequences]:
+            cls.sequences.append(sequence)
 
     def get_sequences(self) -> list['Sequence']:
         """ Get the list of Sequences that can be started, removing the one this element belong to"""
@@ -56,7 +56,8 @@ class SequenceElt(SeqEltBase):
 
         Do whatever is needed to instantiate your element with the Dashboard
         """
-        self.sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
+        pass
+        #self.sequence: str = None if len(self.get_sequences_name()) == 0 else self.get_sequences_name()[0]
 
     @property
     def sequence_obj(self) -> Union['Sequence', None]:
@@ -75,6 +76,7 @@ class SequenceElt(SeqEltBase):
     @sequence.setter
     def sequence(self, value: str):
         self._sequence = value
+        self.mstate.clear_transitions()
         self.mstate.add_external_transition(self.sequence_obj.machine.finished,
                                             self.mstate.done_state)
 

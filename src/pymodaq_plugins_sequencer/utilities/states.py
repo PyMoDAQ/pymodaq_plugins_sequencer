@@ -92,10 +92,14 @@ class CompositeState(MyState):
     def external_transitions(self) -> list[QAbstractTransition]:
         return self._external_transitions
 
-    def clear_state_and_transitions(self):
+    def clear_transitions(self):
         for trans in list(self.external_transitions):
             self.removeTransition(trans)
+
+    def clear_state_and_transitions(self):
+        self.clear_transitions()
         self.setParent(None)
+
 
 class TrackedTransition(QSignalTransition):
     def __init__(self, signal: QtCore.Signal,
