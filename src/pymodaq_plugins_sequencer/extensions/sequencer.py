@@ -45,10 +45,11 @@ class StatusBarManager:
         self.app.set_permanent_status(status)
 
     def create_permanent_widgets(self):
-        self._running_led = QLED()
-        self._running_led.setToolTip('logging status: green (running), red (idle)')
-        self._running_led.clickable = False
-        self.statusbar.addPermanentWidget(self._running_led)
+        # self._running_led = QLED()
+        # self._running_led.setToolTip('logging status: green (running), red (idle)')
+        # self._running_led.clickable = False
+        # self.statusbar.addPermanentWidget(self._running_led)
+        pass
 
 
 class SaverWorker(QtCore.QObject):
@@ -221,6 +222,13 @@ class Sequencer(CustomExt):
         self.add_action('save_sequence', 'Save Sequence', 'file_save',
                         tip='Save as a sequence file',
                         )
+        self.toolbar.addSeparator()
+        self.add_action('do_log', 'Do Logging', 'home_storage',
+                        tip='Log all data generated within the Sequences',
+                        icon_checked_color=self.get_theme().green,
+                        icon_color=self.get_theme().red,
+                        checkable=True,
+                        checked=True)
 
     def connect_things(self):
         """Connect actions and/or other widgets signal to methods"""
@@ -311,7 +319,8 @@ class Sequencer(CustomExt):
     def start(self):
         self._init_logging()
         for sequence in self.sequences.values():
-            sequence.set_log_callback(self.saver_worker.save_data)
+            sequence.set_log_callback(self.saver_worker.save_data if self.is_action_checked('do_log')
+                                      else None)
 
         self._n_emitted = 0
 
