@@ -185,6 +185,7 @@ class GrabElt(SeqEltBase):
         self.modules_manager.forget_callback(self._data_snapped,
                                              module_type=ModuleType.Detector,
                                              disconnect_modules=True)
+        dte.name = dte[0].origin
         self.save_data(dte)
         self.done_signal.emit()
 
