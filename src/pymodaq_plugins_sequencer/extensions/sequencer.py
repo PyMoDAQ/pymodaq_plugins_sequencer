@@ -388,7 +388,7 @@ class Sequencer(CustomExt):
         self.h5_manager.close_file()
 
         #5 updating GUI info
-        self.settings['worker', 'worker_running'] = self.thread_manager.get_thread('saver').isRunning()
+        self.settings['worker', 'worker_running'] = False
 
 
 
