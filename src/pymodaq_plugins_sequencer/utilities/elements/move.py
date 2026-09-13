@@ -223,10 +223,10 @@ class MoveElt(SeqEltBase):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
+        self._wait_move_done = dict_config.pop('wait_move_done', True)
         for act_name in dict_config:
             quantity = Q_(dict_config[act_name])
             self._actuator_and_value.add_update_actuator(act_name, quantity.magnitude, quantity.units)
-        self._wait_move_done = dict_config['wait_move_done']
 
     def _eq(self, other: 'MoveElt'):
         """ Custom method to reimplement to assert two elements are equals"""
@@ -246,4 +246,4 @@ class MoveElt(SeqEltBase):
                 raise ElementError(f'Actuator {act_name} not available in Dashboard')
 
     def size_hint(self) -> QtCore.QSize:
-        return QtCore.QSize(200, 200 + 50 * len(self._actuator_and_value))
+        return QtCore.QSize(200, 150 + 35 * len(self._actuator_and_value))
