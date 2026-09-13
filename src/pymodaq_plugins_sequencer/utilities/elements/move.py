@@ -12,7 +12,7 @@ from pymodaq.control_modules.enums import MoveType
 from pymodaq.control_modules.units import get_unit_to_display
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
-from pymodaq_data import DataToExport
+from pymodaq_data import DataToExport, Q_
 from pymodaq_gui.parameter.pymodaq_ptypes import GroupParameter, registerParameterType
 from pymodaq_gui.parameter import Parameter, ParameterTree
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
@@ -66,6 +66,9 @@ class ActuatorsValuesUnits:
     def __init__(self):
         self._actuators: dict[str, ValueUnits] = {}
 
+    def __len__(self):
+        return len(self._actuators)
+
     def add_update_actuator(self, act_name: str, value: float, units: str):
         self._actuators[act_name] = ValueUnits(value=value, units=units)
 
@@ -81,6 +84,10 @@ class ActuatorsValuesUnits:
         for act_name in self._actuators:
             repr += f'{act_name}: {self._actuators[act_name]} / '
         return repr
+
+    def to_dict(self) -> dict[str, str]:
+        return {act_name: (f'{self.get_value_units(act_name).value} '
+                           f'{self.get_value_units(act_name).units}') for act_name in self._actuators}
 
 
 @SerializableFactory.register_decorator()
@@ -170,15 +177,15 @@ class MoveElt(SeqEltBase):
 
         to be reimplemented
         """
-        move_dict = {}
-
-        return move_dict
+        return self._actuator_and_value.to_dict()
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
-        pass
+        for act_name in dict_config:
+            quantity = Q_(dict_config[act_name])
+            self._actuator_and_value.add_update_actuator(act_name, quantity.magnitude, quantity.units)
 
     def _eq(self, other: 'MoveElt'):
         """ Custom method to reimplement to assert two elements are equals"""
@@ -190,10 +197,12 @@ class MoveElt(SeqEltBase):
     def check_set_is_valid(self):
         """ Check the validity of the element
 
-        Will be called before executing the element. Try to make sure the element is valid or return None
+        Will be called before executing the element. Try to make sure the element is valid or raise ElementError
         if the user may do something!
         """
-        pass
+        for act_name in self._actuator_and_value.actuators:
+            if act_name not in self.dashboard.modules_manager.actuators_name:
+                raise ElementError(f'Actuator {act_name} not available in Dashboard')
 
     def size_hint(self) -> QtCore.QSize:
-        return QtCore.QSize(200, 300)
+        return QtCore.QSize(200, 150 + 50 * len(self._actuator_and_value))
