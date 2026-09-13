@@ -10,6 +10,7 @@ from qtpy import QtCore, QtWidgets
 from pymodaq.control_modules.daq_move import DAQ_Move
 from pymodaq.control_modules.enums import MoveType
 from pymodaq.control_modules.units import get_unit_to_display
+from pymodaq.utils.data import DataActuator
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
 from pymodaq_data import DataToExport, Q_
@@ -41,8 +42,10 @@ class ActuatorScalableParameter(GroupParameter):
     def addNew(self, typ: tuple):
         """
         """
-        name_prefix = ModuleType.Actuator.value
+
         typ = typ[-1]  # Only need last entry here
+        if typ in [child.name() for child in self.children()]:
+            return
         child = {'title': f'{typ}',
                  'name': f'{typ}',
                  'type': 'float',
@@ -99,12 +102,15 @@ class MoveElt(SeqEltBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self._wait_move_done = True
         self._actuator_and_value = ActuatorsValuesUnits()
 
 
     def initialize_element(self):
         pass
+
+    def set_wait_move_done(self, not_wait=True):
+        self._wait_move_done = not not_wait
 
     def do_things_with_dashboard(self):
         pass
@@ -128,6 +134,15 @@ class MoveElt(SeqEltBase):
         base_widget.settings_tree.resizeColumnToContents(0)
         base_widget.settings_tree.setParameters(base_widget.settings, showTop=False)
         base_widget.insert_widget(base_widget.settings_tree)
+
+        base_widget.add_action('wait_move_done', 'WaitForMoveDone',
+                               icon_name='hourglass',
+                               icon_color=get_theme().green,
+                               icon_checked='hourglass_disabled',
+                               icon_checked_color=get_theme().red,
+                               checkable=True,
+                               checked=not self._wait_move_done)
+        base_widget.connect_action('wait_move_done', self.set_wait_move_done)
 
         if (base_widget.parent() is not None and
             hasattr(base_widget.parent(), 'popup_hiding')):
@@ -166,10 +181,32 @@ class MoveElt(SeqEltBase):
         pass
 
     def _execute(self, dte: DataToExport=None):
-        pass
+        """ Move the Actuators to their value and wait or not depending on the
+        wait_move_done boolean"""
+        dte_move = DataToExport('actuators', data=[
+            DataActuator(
+                act_name,
+                data=self._actuator_and_value.get_value_units(act_name).value,
+                units=self._actuator_and_value.get_value_units(act_name).units
+            ) for act_name in self._actuator_and_value.actuators
+            if act_name in self.dashboard.modules_manager.actuators_name
+        ])
+        self.dashboard.modules_manager.move_actuators_with_callback(
+            dte_move,
+            mode=MoveType.ABS,
+            callback=self._on_move_done,
+            do_connect_modules=True)
+        if not self._wait_move_done:
+            self.done_signal.emit()
 
-    def _on_move_done(self):
-        pass
+    def _on_move_done(self, dte: DataToExport):
+        self.dashboard.modules_manager.forget_callback(
+            self._on_move_done,
+            module_type=ModuleType.Actuator,
+            disconnect_modules=True)
+        self.save_data(dte) # to log the data
+        if self._wait_move_done:
+            self.done_signal.emit()
 
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
@@ -177,7 +214,9 @@ class MoveElt(SeqEltBase):
 
         to be reimplemented
         """
-        return self._actuator_and_value.to_dict()
+        move_dict = self._actuator_and_value.to_dict()
+        move_dict['wait_move_done'] = self._wait_move_done
+        return move_dict
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
@@ -186,6 +225,7 @@ class MoveElt(SeqEltBase):
         for act_name in dict_config:
             quantity = Q_(dict_config[act_name])
             self._actuator_and_value.add_update_actuator(act_name, quantity.magnitude, quantity.units)
+        self._wait_move_done = dict_config['wait_move_done']
 
     def _eq(self, other: 'MoveElt'):
         """ Custom method to reimplement to assert two elements are equals"""
@@ -205,4 +245,4 @@ class MoveElt(SeqEltBase):
                 raise ElementError(f'Actuator {act_name} not available in Dashboard')
 
     def size_hint(self) -> QtCore.QSize:
-        return QtCore.QSize(200, 150 + 50 * len(self._actuator_and_value))
+        return QtCore.QSize(200, 200 + 50 * len(self._actuator_and_value))
