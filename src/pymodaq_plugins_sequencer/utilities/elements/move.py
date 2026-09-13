@@ -204,6 +204,7 @@ class MoveElt(SeqEltBase):
             self._on_move_done,
             module_type=ModuleType.Actuator,
             disconnect_modules=True)
+
         self.save_data(dte) # to log the data
         if self._wait_move_done:
             self.done_signal.emit()
