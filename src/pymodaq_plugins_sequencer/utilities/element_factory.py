@@ -5,6 +5,7 @@ from typing import Tuple, Callable, TYPE_CHECKING, Any, Union, Iterable, Mapping
 
 from qtpy import QtCore, QtWidgets
 
+
 from pymodaq_plugins_sequencer.utilities.states import CompositeState, QState
 
 from qt_themes import get_theme
@@ -349,13 +350,15 @@ class SeqEltBase(QtCore.QObject, ActionManager):
 
     def to_dict(self) -> dict[str, Any]:
         """ Serialization in a dictionary"""
+        from pymodaq_plugins_sequencer.utilities.elements.button import AddButtonPlaceholder
         dict_config: dict[str, Any] = {'elt_name': self.elt_name,
                                        'id': self.id,}
         dict_config.update(self.to_dict_custom())
         if self.children_allowed:
             dict_config['children'] = []
             for child in self.children:
-                dict_config['children'].append(child.to_dict())
+                if child.elt_name != AddButtonPlaceholder.elt_name:
+                    dict_config['children'].append(child.to_dict())
         return dict_config
 
     @classmethod
@@ -373,6 +376,7 @@ class SeqEltBase(QtCore.QObject, ActionManager):
         if 'children' in dict_config:
             for child in dict_config['children']:
                 seq_elt.append_child(cls.from_dict(child))
+            seq_elt.append_child(cls.from_dict({'elt_name': 'button', 'id': -2}))
         return seq_elt
 
     def create_widget(self, parent: QtWidgets.QWidget = None) -> QtWidgets.QWidget:
