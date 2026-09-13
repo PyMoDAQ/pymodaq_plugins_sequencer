@@ -67,14 +67,20 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
             return
 
         if index.isValid():
-            elt = index.internalPointer()
+            elt: SeqEltBase = index.internalPointer()
             if elt.name == AddButtonPlaceholder.elt_name:
                 super().updateEditorGeometry(editor, option, index)
                 return
             else:
                 mouse_global_pos = view.cursor().pos()
-                editor.resize(option.rect.width(), option.rect.height())
-                editor.move(mouse_global_pos)
+                #editor.resize(option.rect.width(), option.rect.height())
+                editor.setGeometry(
+                    mouse_global_pos.x(),
+                    mouse_global_pos.y(),
+                    max(elt.size_hint().width(), option.rect.width()),
+                    elt.size_hint().height()
+                )
+                #editor.move(mouse_global_pos)
 
     def createEditor(self, parent, option, index: QModelIndex):
         if not index.isValid():
@@ -112,7 +118,6 @@ class SequenceWidgetDelegate(QtWidgets.QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         """Provide size hint for cells with widgets"""
-        # 1. Obtenir la largeur de colonne actuelle fournie par Qt (ou 100px par défaut si 0)
         view_width = option.rect.width() if option.rect.width() > 0 else 100
 
         if index.isValid():
