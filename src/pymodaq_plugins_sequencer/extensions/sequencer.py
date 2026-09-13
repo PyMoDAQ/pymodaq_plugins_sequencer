@@ -379,7 +379,7 @@ class Sequencer(CustomExt):
 
     def terminate_worker(self):
         """ Will terminate/close/stops a few things when the worker is done working"""
-        # stopping the plotting before flushing/closing the file
+        # stopping things before flushing/closing the file
         #1 disconnecting the connection to here (fired once)
         try:
             self._worker_done.disconnect(self.terminate_worker)

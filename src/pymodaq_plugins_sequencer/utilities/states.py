@@ -59,14 +59,18 @@ class CompositeState(MyState):
         self.children_state: MyState | None = None
         self._external_transitions = []
 
+        self.transitions_to_keep = []
+
         self._elt = elt
 
         self.setup_states()
 
         self.execute_state.entered.connect(elt.execute)
-        self.execute_state.addTransition(elt.children_signal, self.children_state)
+        self.transitions_to_keep.append(
+            self.execute_state.addTransition(elt.children_signal, self.children_state))
 
-        self.addTransition(elt.done_signal, self.done_state)  # apply to all substates
+        self.transitions_to_keep.append(
+            self.addTransition(elt.done_signal, self.done_state))  # apply to all substates)
 
     def set_do_init(self, value: bool) -> None:
         if value and hasattr(self._elt, 'initialize_element'):
@@ -95,6 +99,9 @@ class CompositeState(MyState):
     def clear_transitions(self):
         for trans in list(self.external_transitions):
             self.removeTransition(trans)
+        for trans in self.transitions():
+            if trans not in self.transitions_to_keep:
+                self.removeTransition(trans)
 
     def clear_state_and_transitions(self):
         self.clear_transitions()
