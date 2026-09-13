@@ -5,8 +5,8 @@ from serializall import SerializableFactory
 
 from qtpy import QtCore, QtWidgets
 
-from control_modules.daq_move import DAQ_Move
-from control_modules.enums import MoveType
+from pymodaq.control_modules.daq_move import DAQ_Move
+from pymodaq.control_modules.enums import MoveType
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
 from pymodaq_data import DataToExport
