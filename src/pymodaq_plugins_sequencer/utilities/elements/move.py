@@ -1,3 +1,5 @@
+import dataclasses
+
 import weakref
 from typing import Any
 
@@ -7,16 +9,20 @@ from qtpy import QtCore, QtWidgets
 
 from pymodaq.control_modules.daq_move import DAQ_Move
 from pymodaq.control_modules.enums import MoveType
+from pymodaq.control_modules.units import get_unit_to_display
 from pymodaq.utils.managers.modules import ModuleType
 from pymodaq.utils.scanner.scanner import Orientation
 from pymodaq_data import DataToExport
-from pymodaq_gui.parameter.pymodaq_ptypes import GroupParameter
+from pymodaq_gui.parameter.pymodaq_ptypes import GroupParameter, registerParameterType
+from pymodaq_gui.parameter import Parameter, ParameterTree
 from pymodaq_plugins_sequencer.utilities.element_factory import SeqEltBase, SeqEltFactory, ElementError
 
 from pymodaq_plugins_sequencer.utilities.widget_with_toolbar import WidgetWithToolbar
 from qt_themes import get_theme
 from pymodaq.utils.managers.modules_manager import ModulesManager
 
+from pymodaq.control_modules.instruments import ACTUATOR_NAMES, find_actuator_class_from_name
+from pymodaq_utils.categorizing import categorize_items, find_last_index
 
 ser_factory = SerializableFactory()
 
@@ -27,7 +33,9 @@ class ActuatorScalableParameter(GroupParameter):
 
     def __init__(self, **opts):
         opts['type'] = 'act_move'
-        opts['addMenu'] = categorize_items(ACTUATOR_NAMES)
+        opts['addText'] = 'Add'
+
+        opts['addMenu'] = categorize_items(opts['actuators'])
         super().__init__(**opts)
 
     def addNew(self, typ: tuple):
@@ -35,19 +43,44 @@ class ActuatorScalableParameter(GroupParameter):
         """
         name_prefix = ModuleType.Actuator.value
         typ = typ[-1]  # Only need last entry here
-        new_index = find_last_index(self.children(), name_prefix, format_string='02.0f')
-        child = {'title': f'Actuator {new_index}',
-                 'name': f'{name_prefix}{new_index}',
-                 'type': 'group',
+        child = {'title': f'{typ}',
+                 'name': f'{typ}',
+                 'type': 'float',
                  'removable': True,
-                 'children': [
-                     {'title': 'Name:', 'name': 'name', 'type': 'str', 'value': f'{name_prefix} {new_index}'},
-                     create_info_param(ModuleType.Actuator, typ),
-                     make_actuator_controller_param(typ),
-                 ]}
+                 }
         self.addChild(child)
 
-registerParameterType('groupmove', ExperimentScalableGroupMove, override=True)
+registerParameterType('act_move_elt', ActuatorScalableParameter, override=True)
+
+@dataclasses.dataclass
+class ValueUnits:
+    value: float
+    units: str
+
+    def __repr__(self):
+        return f'{self.value} {self.units}'
+
+
+class ActuatorsValuesUnits:
+
+    def __init__(self):
+        self._actuators: dict[str, ValueUnits] = {}
+
+    def add_update_actuator(self, act_name: str, value: float, units: str):
+        self._actuators[act_name] = ValueUnits(value=value, units=units)
+
+    def get_value_units(self, act_name: str) -> ValueUnits:
+        return self._actuators[act_name]
+
+    @property
+    def actuators(self) -> list[str]:
+        return list(self._actuators.keys())
+
+    def __repr__(self):
+        repr = ''
+        for act_name in self._actuators:
+            repr += f'{act_name}: {self._actuators[act_name]} / '
+        return repr
 
 
 @SerializableFactory.register_decorator()
@@ -60,76 +93,76 @@ class MoveElt(SeqEltBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self._actuators_all_to_restore: list[str] = None
-        self._actuators_selected_to_restore: list[str] = None
+        self._actuator_and_value = ActuatorsValuesUnits()
+
 
     def initialize_element(self):
         pass
 
     def do_things_with_dashboard(self):
-        if self._actuators_all_to_restore is not None:
-            act_all_to_restore: list[DAQ_Move] = []
-            for act_name in self._actuators_all_to_restore:
-                if act_name in self.dashboard.modules_manager.actuators_name:
-                    act_all_to_restore.append(
-                        self.dashboard.modules_manager.get_mod_from_name(act_name,
-                                                                         mod=ModuleType.Actuator))
-            self._actuators_all_to_restore = None
-        else:
-            act_all_to_restore = self.dashboard.modules_manager.actuators_all
-
-        act_selected_to_restore: list[DAQ_Move] = []
-        if self._actuators_selected_to_restore is not None:
-            for act_name in self._actuators_selected_to_restore:
-                if act_name in self.dashboard.modules_manager.actuators_name:
-                    act_selected_to_restore.append(
-                        self.dashboard.modules_manager.get_mod_from_name(act_name,
-                                                                         mod=ModuleType.Actuator))
-            self._actuators_selected_to_restore = None
+        pass
 
     def _create_widget(self, base_widget: WidgetWithToolbar) -> WidgetWithToolbar:
-        self.scanner_ref = weakref.ref(Scanner(actuators=self.scanner.actuators_all,
-                                               selected_actuators=self.scanner.actuators,
-                                               orientation=Orientation.HORIZONTAL))
 
-        base_widget.insert_widget(self.scanner_ref().parent_widget)
-        self.scanner_ref().settings.child('actuators').show()
-        self.scanner_ref().from_dict(self.scanner.to_dict(use_real_actuators=True))
+        base_widget.settings = Parameter.create(name='settings',
+                                                type='act_move_elt',
+                                                actuators=self.dashboard.modules_manager.actuators_name)
+        for act_name in self._actuator_and_value.actuators:
+            base_widget.settings.addNew((act_name,))
+            base_widget.settings.child(act_name).setValue(
+                self._actuator_and_value.get_value_units(act_name).value)
+            base_widget.settings.child(act_name).setOpts(
+                suffix=self._actuator_and_value.get_value_units(act_name).units)
+        base_widget.settings.sigTreeStateChanged.connect(self._on_tree_changed)
+        base_widget.settings_tree = ParameterTree()
+        base_widget.settings_tree.header().setSectionResizeMode(
+            QtWidgets.QHeaderView.ResizeMode.Interactive,
+        )
+        base_widget.settings_tree.resizeColumnToContents(0)
+        base_widget.settings_tree.setParameters(base_widget.settings, showTop=False)
+        base_widget.insert_widget(base_widget.settings_tree)
 
-        if base_widget.parent() is not None:
+        if (base_widget.parent() is not None and
+            hasattr(base_widget.parent(), 'popup_hiding')):
             base_widget.parent().popup_hiding.connect(self._on_editor_closing)
 
         return base_widget
 
+    def _on_tree_changed(self, param_parent, changes):
+        for param, change, data in changes:
+            path = param_parent.childPath(param)
+            if change == "childAdded":
+                child: Parameter = data[0]
+                actuator = self.dashboard.modules_manager.get_mod_from_name(child.name(), mod=ModuleType.Actuator)
+                child.setOpts(suffix=get_unit_to_display(actuator.units))
+                self._actuator_and_value.add_update_actuator(child.name(),
+                                                             child.value(),
+                                                             get_unit_to_display(actuator.units),)
+
+            elif change == "value":
+                self._actuator_and_value.add_update_actuator(
+                    param.name(), data, param.opts['suffix'])
+
+            elif change == "parent":
+                pass
+
+            elif change == "options":
+                pass
+
+            elif change == "limits":
+                pass
+
+            elif change == 'contextMenu':
+                pass
+
     def _on_editor_closing(self):
-        if self.scanner_ref is not None and self.scanner_ref() is not None:
-            self.scanner.from_dict(self.scanner_ref().to_dict(use_real_actuators=True))
-            self.scanner.save_scanner_settings()
+        pass
 
     def _execute(self, dte: DataToExport=None):
-        if self._ind_execute == 0:
-            self.scanner.set_scan()
-
-        if self._ind_execute < self.scanner.n_steps:
-            next_values = self.scanner.positions_at(self._ind_execute)
-            self.dashboard.modules_manager.move_actuators_with_callback(
-                dte_act = next_values,
-                mode= MoveType.ABS,
-                callback = self._on_move_done,
-                do_connect_modules=True)
-
-            """ This will execute the children state and its bundled elements n_repeat times"""
-            self._ind_execute += 1
-        else:
-            self._ind_execute = 0
-            self.done_signal.emit()
+        pass
 
     def _on_move_done(self):
-        self.dashboard.modules_manager.forget_callback(self._on_move_done,
-                                                       module_type = ModuleType.Actuator,
-                                                       disconnect_modules = True
-                                                       )
-        self.children_signal.emit()
+        pass
 
     def to_dict_custom(self) -> dict[str, Any]:
         """ adds attribute to a dict in order to produce a human readable
@@ -137,30 +170,22 @@ class MoveElt(SeqEltBase):
 
         to be reimplemented
         """
-        return self.scanner.to_dict()
+        move_dict = {}
+
+        return move_dict
 
     def from_dict_custom(self, dict_config: dict[str, Any]):
         """ Create/set the custom part of the element to finish initialization
         using setters, attribute assignment or methods
         """
-        #loading from file implies actuators is a list of str but at the moment of restoring the elt, the dashboard has
-        # not been set yet and self.scanner has also no actuators yet...
-        if len(dict_config['actuators']) > 0 and isinstance(dict_config['actuators'][0], str):
-            self._actuators_all_to_restore = dict_config['actuators']
-            dict_config['actuators'] = []  # will be restored later, when dashboard is set
+        pass
 
-        if len(dict_config['selected']) > 0 and isinstance(dict_config['selected'][0], str):
-            self._actuators_selected_to_restore = dict_config['selected']
-            dict_config['selected'] = []  # will be restored later, when dashboard is set
-
-        self.scanner.from_dict(dict_config)
-
-    def _eq(self, other: 'ScannerElt'):
+    def _eq(self, other: 'MoveElt'):
         """ Custom method to reimplement to assert two elements are equals"""
-        return self.scanner.to_dict() == other.scanner.to_dict()
+        return self.to_dict() == other.to_dict()
 
     def __repr__(self):
-        return f'{super().__repr__()} - {self.scanner}'
+        return f"{super().__repr__()} - {self._actuator_and_value}"
 
     def check_set_is_valid(self):
         """ Check the validity of the element
@@ -168,9 +193,7 @@ class MoveElt(SeqEltBase):
         Will be called before executing the element. Try to make sure the element is valid or return None
         if the user may do something!
         """
-        self.scanner.set_scan()
-        if not (self.scanner.n_steps >= 1):
-            raise ElementError(f'Element {self}: at least one scan step required')
+        pass
 
     def size_hint(self) -> QtCore.QSize:
         return QtCore.QSize(200, 300)
